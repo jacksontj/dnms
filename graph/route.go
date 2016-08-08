@@ -16,16 +16,24 @@ type NetworkRoute struct {
 	RefCount int
 }
 
-func (r *NetworkRoute) SameHops(hops []string) bool {
+func (r *NetworkRoute) SamePath(path []string) bool {
 	// check len
-	if len(hops) != len(r.Path) {
+	if len(path) != len(r.Path) {
 		return false
 	}
 
-	for i, hop := range hops {
+	for i, hop := range path {
 		if hop != r.Path[i].Name {
 			return false
 		}
 	}
 	return true
+}
+
+func (r *NetworkRoute) Hops() []string {
+	hops := make([]string, 0, len(r.Path))
+	for _, node := range r.Path {
+		hops = append(hops, node.Name)
+	}
+	return hops
 }

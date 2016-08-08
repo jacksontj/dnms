@@ -12,20 +12,20 @@ import (
 // TODO: maintain some maps for easier lookup
 type NetworkGraph struct {
 	// nodeName -> Node
-	nodesMap map[string]NetworkNode
+	nodesMap map[string]*NetworkNode
 
 	// TODO: change linkKey to string
 	// nodeName,nodeName -> NetworkLink
-	linksMap map[NetworkLinkKey]NetworkLink
+	linksMap map[NetworkLinkKey]*NetworkLink
 
-	routesMap map[string]NetworkRoute
+	routesMap map[string]*NetworkRoute
 }
 
 func Create() *NetworkGraph {
 	return &NetworkGraph{
-		nodesMap:  make(map[string]NetworkNode),
-		linksMap:  make(map[NetworkLinkKey]NetworkLink),
-		routesMap: make(map[string]NetworkRoute),
+		nodesMap:  make(map[string]*NetworkNode),
+		linksMap:  make(map[NetworkLinkKey]*NetworkLink),
+		routesMap: make(map[string]*NetworkRoute),
 	}
 }
 
@@ -33,18 +33,18 @@ func (g *NetworkGraph) IncrNode(name string) *NetworkNode {
 	n, ok := g.nodesMap[name]
 	// if this one doesn't exist, lets add it
 	if !ok {
-		n = NetworkNode{
+		n = &NetworkNode{
 			Name: name,
 		}
 		g.nodesMap[name] = n
 	}
 	n.RefCount++
-	return &n
+	return n
 }
 
 func (g *NetworkGraph) GetNode(name string) *NetworkNode {
 	n, _ := g.nodesMap[name]
-	return &n
+	return n
 }
 
 func (g *NetworkGraph) GetNodeCount() int {
@@ -69,20 +69,20 @@ func (g *NetworkGraph) IncrLink(src, dst string) *NetworkLink {
 	key := NetworkLinkKey{src, dst}
 	l, ok := g.linksMap[key]
 	if !ok {
-		l = NetworkLink{
+		l = &NetworkLink{
 			Src: g.IncrNode(src),
 			Dst: g.IncrNode(dst),
 		}
 		g.linksMap[key] = l
 	}
 	l.RefCount++
-	return &l
+	return l
 }
 
 func (g *NetworkGraph) GetLink(src, dst string) *NetworkLink {
 	key := NetworkLinkKey{src, dst}
 	l, _ := g.linksMap[key]
-	return &l
+	return l
 }
 
 func (g *NetworkGraph) GetLinkCount() int {
@@ -131,7 +131,7 @@ func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
 				g.IncrLink(hops[i-1], hop)
 			}
 		}
-		route = NetworkRoute{
+		route = &NetworkRoute{
 			Path: path,
 		}
 		g.routesMap[key] = route
@@ -140,12 +140,12 @@ func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
 	// increment route's refcount
 	route.RefCount++
 
-	return &route
+	return route
 }
 
 func (g *NetworkGraph) GetRoute(hops []string) *NetworkRoute {
 	r, _ := g.routesMap[g.pathKey(hops)]
-	return &r
+	return r
 }
 
 func (g *NetworkGraph) GetRouteCount() int {

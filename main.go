@@ -25,7 +25,9 @@ func tracerouteExample() {
 	}
 }
 
-func mapper(g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
+func mapper(routeMap *RouteMap, g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
+	srcPort := 33435
+	dstName := "173.194.72.147" // a specific IP-- so we can test
 	for {
 		nodes := mlist.Members()
 
@@ -39,11 +41,11 @@ func mapper(g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
 			logrus.Infof("get routes to peer: %v %v", node.Addr, node)
 
 			options := traceroute.TracerouteOptions{}
-			options.SetSrcPort(33435) // TODO: config
-			options.SetDstPort(33434) // TODO: config
+			options.SetSrcPort(srcPort) // TODO: config
+			options.SetDstPort(33434)   // TODO: config
 
 			ret, err := traceroute.Traceroute(
-				"173.194.72.147",  // a specific IP-- so we can test
+				dstName,
 				&options,
 			)
 			if err != nil {
@@ -62,9 +64,18 @@ func mapper(g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
 			//src, _ := net.ResolveUDPAddr("udp", "localhost:33434")
 			//dst, _ := net.ResolveUDPAddr("udp", "www.google.com:33434")
 
-			// TODO: store src/dst -> return here
-			// This will be our map of how we can send stuff across the network
-			g.IncrRoute(path)
+			currRoute := routeMap.GetRouteOption(srcPort, dstName)
+
+			// If we don't have a current route, or the paths differ-- lets update
+			if currRoute == nil || !currRoute.SamePath(path) {
+				// Add new one
+				routeMap.UpdateRouteOption(srcPort, dstName, g.IncrRoute(path))
+
+				// Remove old one if it exists
+				if currRoute != nil {
+					g.DecrRoute(currRoute.Hops())
+				}
+			}
 
 			// TODO configurable rate
 			time.Sleep(time.Second * 5)
@@ -75,6 +86,7 @@ func mapper(g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
 
 func main() {
 	g := graph.Create()
+	routeMap := NewRouteMap()
 
 	/*
 		This is the main daemon. Which has the following responsibilities:
@@ -95,7 +107,7 @@ func main() {
 
 	mlist.Join([]string{"127.0.0.1:55555"})
 
-	go mapper(g, mlist)
+	go mapper(routeMap, g, mlist)
 
 	for {
 		time.Sleep(time.Second)
