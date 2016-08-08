@@ -9,10 +9,14 @@ import (
 
 // TODO: maintain some maps for easier lookup
 type NetworkGraph struct {
+	// nodeName -> Node
 	nodesMap map[string]*NetworkNode
 
+	// TODO: change linkKey to string
+	// nodeName,nodeName -> NetworkLink
 	linksMap map[NetworkLinkKey]*NetworkLink
 
+	// TODO: change routeKey to string
 	routesMap map[RouteKey]*NetworkRoute
 }
 
@@ -90,14 +94,14 @@ func (g *NetworkGraph) DecrLink(src, dst net.IP) {
 }
 
 // TODO: don't delete the old one until the new one is in-- to avoid flapping
-func (g *NetworkGraph) AddRoute(src, dst net.UDPAddr, hops []net.IP) *NetworkRoute {
+func (g *NetworkGraph) IncrRoute(src, dst net.UDPAddr, hops []net.IP) *NetworkRoute {
 	key := RouteKey{src.String(), dst.String()}
 	r, ok := g.routesMap[key]
 
 	// If a matching route exists, but the path is different, we are going to replace it
 	if ok && !r.SameHops(hops) {
 		ok = false
-		g.RemoveRoute(src, dst)
+		g.DecrRoute(src, dst)
 	}
 
 	if !ok {
@@ -129,7 +133,7 @@ func (g *NetworkGraph) GetRoute(src, dst net.UDPAddr) *NetworkRoute {
 	return r
 }
 
-func (g *NetworkGraph) RemoveRoute(src, dst net.UDPAddr) {
+func (g *NetworkGraph) DecrRoute(src, dst net.UDPAddr) {
 	key := RouteKey{src.String(), dst.String()}
 	r, ok := g.routesMap[key]
 	if !ok {

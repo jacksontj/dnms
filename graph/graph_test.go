@@ -132,75 +132,9 @@ func TestRoutes(t *testing.T) {
 		dst, _ := net.ResolveUDPAddr("udp", routeKey.Dst)
 
 		for i := 0; i < rSpec.Count; i++ {
-			g.AddRoute(*src, *dst, rSpec.Path)
+			g.IncrRoute(*src, *dst, rSpec.Path)
 		}
 	}
 
 	validateGraph(t, g, expectedNodes, expectedLinks, expectedRoutes)
 }
-
-/*
-   def test_routes(self):
-       routes = {
-           (('a', 1), ('z', 1)): [
-               'a',
-               'b',
-               'c',
-               'z',
-           ],
-       }
-       expected_routes = {
-           (('a', 1), ('z', 1)): 1,
-       }
-
-       expected_links = {
-           ('a', 'b'): 1,
-           ('b', 'c'): 1,
-           ('c', 'z'): 1,
-       }
-
-       expected_nodes = {
-           'a': 1,
-           'z': 1,
-           # these are 2 since multiple links reference the node
-           'b': 2,
-           'c': 2,
-       }
-
-       for route_key, route in routes.iteritems():
-           self.graph.add_route(route_key[0], route_key[1], route)
-
-       self._verify_graph(
-           routes=expected_routes,
-           links=expected_links,
-           nodes=expected_nodes,
-       )
-
-       # lets replace the route with a different one
-       routes = {
-           (('a', 1), ('z', 1)): [
-               'a',
-               'z',
-           ],
-       }
-       expected_routes = {
-           (('a', 1), ('z', 1)): 1,
-       }
-
-       expected_links = {
-           ('a', 'z'): 1,
-       }
-
-       expected_nodes = {
-           'a': 1,
-           'z': 1,
-       }
-       for route_key, route in routes.iteritems():
-           self.graph.add_route(route_key[0], route_key[1], route)
-
-       self._verify_graph(
-           routes=expected_routes,
-           links=expected_links,
-           nodes=expected_nodes,
-       )
-*/

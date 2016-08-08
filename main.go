@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/hashicorp/memberlist"
+	"github.com/jacksontj/dnms/graph"
 	"github.com/jacksontj/dnms/traceroute"
 )
 
@@ -23,7 +24,7 @@ func tracerouteExample() {
 	}
 }
 
-func mapper(mlist *memberlist.Memberlist) {
+func mapper(g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
 	for {
 		nodes := mlist.Members()
 
@@ -43,6 +44,7 @@ func mapper(mlist *memberlist.Memberlist) {
 }
 
 func main() {
+	g := graph.Create()
 	// TODO: remove
 	tracerouteExample()
 
@@ -65,7 +67,7 @@ func main() {
 
 	mlist.Join([]string{"127.0.0.1:55555"})
 
-	go mapper(mlist)
+	go mapper(g, mlist)
 
 	for {
 		time.Sleep(time.Second)
