@@ -60,8 +60,6 @@ func (r *RouteMap) UpdateRouteOption(srcPort int, dst string, newRoute *graph.Ne
 		r.NodeRouteMap[key] = newRoute
 	}
 
-	// TODO: handle case where it changed
-
 	r.AddNodeKey(dst, key)
 }
 
