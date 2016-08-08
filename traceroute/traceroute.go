@@ -8,6 +8,8 @@ import (
 	"net"
 	"syscall"
 	"time"
+
+	"github.com/Sirupsen/logrus"
 )
 
 // Return the first non-loopback address as a 4 byte IP address. This address
@@ -131,10 +133,17 @@ func Traceroute(dest string, options *TracerouteOptions, c ...chan TracerouteHop
 		defer syscall.Close(sendSocket)
 
 		// Bind to the local socket to listen for ICMP packets
-		syscall.Bind(recvSocket, &syscall.SockaddrInet4{Port: options.DstPort(), Addr: socketAddr})
+		syscall.Bind(recvSocket, &syscall.SockaddrInet4{Port: options.DstPort()})
 
-		// if srcPort is set, bind to that as well
-		syscall.Bind(sendSocket, &syscall.SockaddrInet4{Port: options.SrcPort(), Addr: socketAddr})
+		if options.SrcPort() > 0 {
+			// if srcPort is set, bind to that as well
+			syscall.SetsockoptInt(sendSocket, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
+			err = syscall.Bind(sendSocket, &syscall.SockaddrInet4{Port: options.SrcPort(), Addr: socketAddr})
+			// TODO: non-fatal error
+			if err != nil {
+				logrus.Fatalf("err binding: %v", err)
+			}
+		}
 
 		// Send a single null byte UDP packet
 		syscall.Sendto(sendSocket, []byte{0x0}, 0, &syscall.SockaddrInet4{Port: options.DstPort(), Addr: destAddr})

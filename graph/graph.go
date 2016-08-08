@@ -2,7 +2,9 @@
 package graph
 
 import (
-	"net"
+	"crypto/md5"
+	"encoding/hex"
+	"io"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -10,21 +12,20 @@ import (
 // TODO: maintain some maps for easier lookup
 type NetworkGraph struct {
 	// nodeName -> Node
-	nodesMap map[string]*NetworkNode
+	nodesMap map[string]NetworkNode
 
 	// TODO: change linkKey to string
 	// nodeName,nodeName -> NetworkLink
-	linksMap map[NetworkLinkKey]*NetworkLink
+	linksMap map[NetworkLinkKey]NetworkLink
 
-	// TODO: change routeKey to string
-	routesMap map[RouteKey]*NetworkRoute
+	routesMap map[string]NetworkRoute
 }
 
 func Create() *NetworkGraph {
 	return &NetworkGraph{
-		nodesMap:  make(map[string]*NetworkNode),
-		linksMap:  make(map[NetworkLinkKey]*NetworkLink),
-		routesMap: make(map[RouteKey]*NetworkRoute),
+		nodesMap:  make(map[string]NetworkNode),
+		linksMap:  make(map[NetworkLinkKey]NetworkLink),
+		routesMap: make(map[string]NetworkRoute),
 	}
 }
 
@@ -32,18 +33,18 @@ func (g *NetworkGraph) IncrNode(name string) *NetworkNode {
 	n, ok := g.nodesMap[name]
 	// if this one doesn't exist, lets add it
 	if !ok {
-		n = &NetworkNode{
+		n = NetworkNode{
 			Name: name,
 		}
 		g.nodesMap[name] = n
 	}
 	n.RefCount++
-	return n
+	return &n
 }
 
 func (g *NetworkGraph) GetNode(name string) *NetworkNode {
 	n, _ := g.nodesMap[name]
-	return n
+	return &n
 }
 
 func (g *NetworkGraph) GetNodeCount() int {
@@ -68,20 +69,20 @@ func (g *NetworkGraph) IncrLink(src, dst string) *NetworkLink {
 	key := NetworkLinkKey{src, dst}
 	l, ok := g.linksMap[key]
 	if !ok {
-		l = &NetworkLink{
+		l = NetworkLink{
 			Src: g.IncrNode(src),
 			Dst: g.IncrNode(dst),
 		}
 		g.linksMap[key] = l
 	}
 	l.RefCount++
-	return l
+	return &l
 }
 
 func (g *NetworkGraph) GetLink(src, dst string) *NetworkLink {
 	key := NetworkLinkKey{src, dst}
 	l, _ := g.linksMap[key]
-	return l
+	return &l
 }
 
 func (g *NetworkGraph) GetLinkCount() int {
@@ -105,56 +106,54 @@ func (g *NetworkGraph) DecrLink(src, dst string) {
 	}
 }
 
-// TODO: don't delete the old one until the new one is in-- to avoid flapping
-func (g *NetworkGraph) IncrRoute(src, dst net.UDPAddr, hops []string) *NetworkRoute {
-	key := RouteKey{src.String(), dst.String()}
-	r, ok := g.routesMap[key]
-
-	// If a matching route exists, but the path is different, we are going to replace it
-	if ok {
-		if !r.SameHops(hops) {
-			ok = false
-			g.DecrRoute(src, dst)
-		} else {
-			return r // same exact thing
-		}
+func (g *NetworkGraph) pathKey(hops []string) string {
+	h := md5.New()
+	for _, hop := range hops {
+		io.WriteString(h, hop)
 	}
-
-	if !ok {
-		// convert hops to links
-		links := make([]*NetworkLink, 0)
-		for i, hopIP := range hops {
-			nextI := i + 1
-			if nextI >= len(hops) {
-				break
-			}
-			links = append(links, g.IncrLink(hopIP, hops[nextI]))
-		}
-
-		r = &NetworkRoute{
-			Src:   src,
-			Dst:   dst,
-			Links: links,
-			Hops:  hops,
-		}
-		g.routesMap[key] = r
-	}
-	r.RefCount++
-	return r
+	return hex.EncodeToString(h.Sum(nil))
 }
 
-func (g *NetworkGraph) GetRoute(src, dst net.UDPAddr) *NetworkRoute {
-	key := RouteKey{src.String(), dst.String()}
-	r, _ := g.routesMap[key]
-	return r
+// TODO: don't delete the old one until the new one is in-- to avoid flapping
+func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
+	key := g.pathKey(hops)
+
+	// check if we have a route for this already
+	route, ok := g.routesMap[key]
+	// if we don't have it, lets make it
+	if !ok {
+		logrus.Infof("New Route: key=%s %v", key, hops)
+		path := make([]*NetworkNode, 0, len(hops))
+		for i, hop := range hops {
+			path = append(path, g.IncrNode(hop))
+			// If there was something prior-- lets add the link as well
+			if i-1 > 0 {
+				g.IncrLink(hops[i-1], hop)
+			}
+		}
+		route = NetworkRoute{
+			Path: path,
+		}
+		g.routesMap[key] = route
+	}
+
+	// increment route's refcount
+	route.RefCount++
+
+	return &route
+}
+
+func (g *NetworkGraph) GetRoute(hops []string) *NetworkRoute {
+	r, _ := g.routesMap[g.pathKey(hops)]
+	return &r
 }
 
 func (g *NetworkGraph) GetRouteCount() int {
 	return len(g.routesMap)
 }
 
-func (g *NetworkGraph) DecrRoute(src, dst net.UDPAddr) {
-	key := RouteKey{src.String(), dst.String()}
+func (g *NetworkGraph) DecrRoute(hops []string) {
+	key := g.pathKey(hops)
 	r, ok := g.routesMap[key]
 	if !ok {
 		logrus.Warningf("Attempted to remove route %v which wasn't in the graph", key)
@@ -162,13 +161,15 @@ func (g *NetworkGraph) DecrRoute(src, dst net.UDPAddr) {
 	}
 
 	// decrement all the links/nodes as well
-	for _, link := range r.Links {
-		g.DecrLink(link.Src.Name, link.Dst.Name)
+	for i, node := range r.Path {
+		g.DecrNode(node.Name)
+		if i-1 > 0 {
+			g.DecrLink(r.Path[i-1].Name, node.Name)
+		}
 	}
 
 	r.RefCount--
-	// TODO: fix this-- routes are a bit of a mess
-	if r.RefCount == 0 || true {
+	if r.RefCount == 0 {
 		delete(g.routesMap, key)
 	}
 }

@@ -1,7 +1,5 @@
 package graph
 
-import "net"
-
 type RouteKey struct {
 	Src string
 	Dst string
@@ -13,24 +11,19 @@ type RouteKey struct {
 // TODO: TTL for routes? If we just start up we don't want to have to re-ping the
 // world before we are useful
 type NetworkRoute struct {
-	Src net.UDPAddr
-	Dst net.UDPAddr
-
-	Links []*NetworkLink
-	// TODO don't store
-	Hops []string
+	Path []*NetworkNode
 
 	RefCount int
 }
 
 func (r *NetworkRoute) SameHops(hops []string) bool {
 	// check len
-	if len(hops) != len(r.Hops) {
+	if len(hops) != len(r.Path) {
 		return false
 	}
 
 	for i, hop := range hops {
-		if hop != r.Hops[i] {
+		if hop != r.Path[i].Name {
 			return false
 		}
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -40,11 +39,11 @@ func mapper(g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
 			logrus.Infof("get routes to peer: %v %v", node.Addr, node)
 
 			options := traceroute.TracerouteOptions{}
-			options.SetSrcPort(33434) // TODO: config
+			options.SetSrcPort(33435) // TODO: config
 			options.SetDstPort(33434) // TODO: config
 
 			ret, err := traceroute.Traceroute(
-				"www.google.com",
+				"173.194.72.147",  // a specific IP-- so we can test
 				&options,
 			)
 			if err != nil {
@@ -60,10 +59,12 @@ func mapper(g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
 				path = append(path, hop.AddressString())
 			}
 
-			src, _ := net.ResolveUDPAddr("udp", "localhost:33434")
-			dst, _ := net.ResolveUDPAddr("udp", "www.google.com:33434")
+			//src, _ := net.ResolveUDPAddr("udp", "localhost:33434")
+			//dst, _ := net.ResolveUDPAddr("udp", "www.google.com:33434")
 
-			g.IncrRoute(*src, *dst, path)
+			// TODO: store src/dst -> return here
+			// This will be our map of how we can send stuff across the network
+			g.IncrRoute(path)
 
 			// TODO configurable rate
 			time.Sleep(time.Second * 5)
