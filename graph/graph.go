@@ -24,7 +24,7 @@ func Create() *NetworkGraph {
 	}
 }
 
-func (g *NetworkGraph) AddNode(ip net.IP) *NetworkNode {
+func (g *NetworkGraph) IncrNode(ip net.IP) *NetworkNode {
 	key := ip.String()
 	n, ok := g.nodesMap[key]
 	// if this one doesn't exist, lets add it
@@ -44,7 +44,7 @@ func (g *NetworkGraph) GetNode(ip net.IP) *NetworkNode {
 	return n
 }
 
-func (g *NetworkGraph) RemoveNode(ip net.IP) {
+func (g *NetworkGraph) DecrNode(ip net.IP) {
 	key := ip.String()
 	n, ok := g.nodesMap[key]
 
@@ -59,13 +59,13 @@ func (g *NetworkGraph) RemoveNode(ip net.IP) {
 	}
 }
 
-func (g *NetworkGraph) AddLink(src, dst net.IP) *NetworkLink {
+func (g *NetworkGraph) IncrLink(src, dst net.IP) *NetworkLink {
 	key := NetworkLinkKey{src.String(), dst.String()}
 	l, ok := g.linksMap[key]
 	if !ok {
 		l = &NetworkLink{
-			Src: g.AddNode(src),
-			Dst: g.AddNode(dst),
+			Src: g.IncrNode(src),
+			Dst: g.IncrNode(dst),
 		}
 		g.linksMap[key] = l
 	}
@@ -79,7 +79,7 @@ func (g *NetworkGraph) GetLink(src, dst net.IP) *NetworkLink {
 	return l
 }
 
-func (g *NetworkGraph) RemoveLink(src, dst net.IP) {
+func (g *NetworkGraph) DecrLink(src, dst net.IP) {
 	key := NetworkLinkKey{src.String(), dst.String()}
 	l, ok := g.linksMap[key]
 	if !ok {
@@ -108,7 +108,7 @@ func (g *NetworkGraph) AddRoute(src, dst net.UDPAddr, hops []net.IP) *NetworkRou
 			if nextI >= len(hops) {
 				break
 			}
-			links = append(links, g.AddLink(hopIP, hops[nextI]))
+			links = append(links, g.IncrLink(hopIP, hops[nextI]))
 		}
 
 		r = &NetworkRoute{

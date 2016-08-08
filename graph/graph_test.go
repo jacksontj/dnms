@@ -62,7 +62,7 @@ func TestNodes(t *testing.T) {
 	for ipString, count := range expectedNodes {
 		ip := net.ParseIP(ipString)
 		for i := 0; i < count; i++ {
-			g.AddNode(ip)
+			g.IncrNode(ip)
 		}
 	}
 
@@ -87,7 +87,7 @@ func TestLinks(t *testing.T) {
 		srcip := net.ParseIP(linkKey.Src)
 		dstip := net.ParseIP(linkKey.Dst)
 		for i := 0; i < count; i++ {
-			g.AddLink(srcip, dstip)
+			g.IncrLink(srcip, dstip)
 		}
 	}
 
