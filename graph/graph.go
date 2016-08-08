@@ -96,12 +96,12 @@ func (g *NetworkGraph) DecrLink(src, dst string) {
 		logrus.Warningf("Attempted to remove link %v which wasn't in the graph", key)
 		return
 	}
-	// Decrement our children
-	g.DecrNode(src)
-	g.DecrNode(dst)
 	// decrement ourselves
 	l.RefCount--
 	if l.RefCount == 0 {
+		// Decrement our children
+		g.DecrNode(src)
+		g.DecrNode(dst)
 		delete(g.LinksMap, key)
 	}
 }
@@ -114,7 +114,6 @@ func (g *NetworkGraph) pathKey(hops []string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// TODO: don't delete the old one until the new one is in-- to avoid flapping
 func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
 	key := g.pathKey(hops)
 
