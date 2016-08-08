@@ -1,0 +1,57 @@
+Implementation
+
+The goal here is to create a few layers that in themselves create something useful
+
+Base parts:
+    - memberlist (who all we should talk to)
+
+Layer #1: Dynamic mapping of the network
+    We have a list of peers to talk to (memberlist), by doing traceroutes over a pool
+    of source addresses we can determine what all routes we are capable of exercising
+    in the network
+
+
+    NetworkTopology
+        // attributes
+        graph graph.Graph
+
+        // Link peers to the routes they have
+        map[*memberlist.Node]map[int]*Route
+
+        // for refcounting edges (since we can't seem to get back edges...)
+        map[EdgeKey]int
+
+
+        // methods
+        AddRoute    // add/update route
+        RemoveRoute // remove a route (presumably when a node dies)
+
+    A `Route` in this term is a specific path from a source port of ours to a peer
+    in the network
+
+    Route struct
+        // attributes
+        src_port int    // What port we sent the request from
+        destination *memberlist.Node    // What peer we are talking to
+        // which nodes through the graph we go through (note this doesn't include
+        // the beginning (us) or the end (the peer).
+        path []*graph.Node
+
+        // methods
+
+    Using these routes we construct a graph of the network topology where the
+    nodes are L3 devices and the edges are network links
+
+        NetworkNode
+            // attributes
+            name string
+            addr net.IP
+
+            // methods
+
+        NetworkLink
+            // attributes
+
+            //methods
+
+Layer #2: network availability/stability/performance
