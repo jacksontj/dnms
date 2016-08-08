@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -21,6 +22,7 @@ func tracerouteExample() {
 		logrus.Infof("Traceroute err: %v", err)
 	} else {
 		logrus.Infof("Traceroute: %v", ret)
+
 	}
 }
 
@@ -36,17 +38,42 @@ func mapper(g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
 
 			// Otherwise, lets do some stuff
 			logrus.Infof("get routes to peer: %v %v", node.Addr, node)
+
+			options := traceroute.TracerouteOptions{}
+			options.SetSrcPort(33434) // TODO: config
+			options.SetDstPort(33434) // TODO: config
+
+			ret, err := traceroute.Traceroute(
+				"www.google.com",
+				&options,
+			)
+			if err != nil {
+				logrus.Infof("Traceroute err: %v", err)
+				continue
+			}
+
+			logrus.Info("Traceroute: complete")
+
+			path := make([]string, 0, len(ret.Hops))
+
+			for _, hop := range ret.Hops {
+				path = append(path, hop.AddressString())
+			}
+
+			src, _ := net.ResolveUDPAddr("udp", "localhost:33434")
+			dst, _ := net.ResolveUDPAddr("udp", "www.google.com:33434")
+
+			g.IncrRoute(*src, *dst, path)
+
+			// TODO configurable rate
+			time.Sleep(time.Second * 5)
 		}
-		// TODO configurable rate
-		time.Sleep(time.Second * 5)
 	}
 
 }
 
 func main() {
 	g := graph.Create()
-	// TODO: remove
-	tracerouteExample()
 
 	/*
 		This is the main daemon. Which has the following responsibilities:
@@ -71,7 +98,12 @@ func main() {
 
 	for {
 		time.Sleep(time.Second)
-		logrus.Infof("peers: count=%d", mlist.NumMembers()-1)
+		logrus.Infof("peers=%d nodes=%d links=%d routes=%d",
+			mlist.NumMembers()-1,
+			g.GetNodeCount(),
+			g.GetLinkCount(),
+			g.GetRouteCount(),
+		)
 	}
 
 }

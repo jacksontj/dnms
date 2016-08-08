@@ -8,6 +8,7 @@ import "net"
 // TODO: maintain pointers to NetworkLink for traversal
 type NetworkNode struct {
 	Name string
+	// TODO: use? attempt to parse string
 	Addr net.IP
 
 	RefCount int

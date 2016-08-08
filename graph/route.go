@@ -1,10 +1,6 @@
 package graph
 
-import (
-	"net"
-
-	"github.com/Sirupsen/logrus"
-)
+import "net"
 
 type RouteKey struct {
 	Src string
@@ -22,20 +18,19 @@ type NetworkRoute struct {
 
 	Links []*NetworkLink
 	// TODO don't store
-	Hops []net.IP
+	Hops []string
 
 	RefCount int
 }
 
-func (r *NetworkRoute) SameHops(hops []net.IP) bool {
+func (r *NetworkRoute) SameHops(hops []string) bool {
 	// check len
 	if len(hops) != len(r.Hops) {
 		return false
 	}
 
 	for i, hop := range hops {
-		logrus.Infof("i=%d hop=%v ourHop=%v", i, hop, r.Hops[i])
-		if !hop.Equal(r.Hops[i]) {
+		if hop != r.Hops[i] {
 			return false
 		}
 	}

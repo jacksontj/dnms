@@ -10,7 +10,7 @@ func validateGraph(t *testing.T, g *NetworkGraph, expectedNodes map[string]int, 
 	// Validate Nodes
 	// TODO: test for too many nodes
 	for ipString, count := range expectedNodes {
-		node := g.GetNode(net.ParseIP(ipString))
+		node := g.GetNode(ipString)
 		if node == nil {
 			t.Error("Node %s missing!", ipString)
 		} else {
@@ -22,9 +22,7 @@ func validateGraph(t *testing.T, g *NetworkGraph, expectedNodes map[string]int, 
 
 	// validate Links
 	for linkKey, count := range expectedLinks {
-		srcip := net.ParseIP(linkKey.Src)
-		dstip := net.ParseIP(linkKey.Dst)
-		link := g.GetLink(srcip, dstip)
+		link := g.GetLink(linkKey.Src, linkKey.Dst)
 		if link == nil {
 			t.Error("Link %v missing!", linkKey)
 		} else {
@@ -60,9 +58,8 @@ func TestNodes(t *testing.T) {
 	}
 
 	for ipString, count := range expectedNodes {
-		ip := net.ParseIP(ipString)
 		for i := 0; i < count; i++ {
-			g.IncrNode(ip)
+			g.IncrNode(ipString)
 		}
 	}
 
@@ -84,10 +81,8 @@ func TestLinks(t *testing.T) {
 	}
 
 	for linkKey, count := range expectedLinks {
-		srcip := net.ParseIP(linkKey.Src)
-		dstip := net.ParseIP(linkKey.Dst)
 		for i := 0; i < count; i++ {
-			g.IncrLink(srcip, dstip)
+			g.IncrLink(linkKey.Src, linkKey.Dst)
 		}
 	}
 
@@ -97,7 +92,7 @@ func TestLinks(t *testing.T) {
 // Routes are hard to define in a simple map-- this is cheating ;)
 type RouteTestSpec struct {
 	Count int
-	Path  []net.IP
+	Path  []string
 }
 
 func TestRoutes(t *testing.T) {
@@ -105,11 +100,11 @@ func TestRoutes(t *testing.T) {
 	expectedRoutes := map[RouteKey]RouteTestSpec{
 		RouteKey{"192.168.1.1:1", "192.168.1.4:1"}: RouteTestSpec{
 			Count: 1,
-			Path: []net.IP{
-				net.ParseIP("192.168.1.1"),
-				net.ParseIP("192.168.1.2"),
-				net.ParseIP("192.168.1.3"),
-				net.ParseIP("192.168.1.4"),
+			Path: []string{
+				"192.168.1.1",
+				"192.168.1.2",
+				"192.168.1.3",
+				"192.168.1.4",
 			},
 		},
 	}
@@ -137,4 +132,38 @@ func TestRoutes(t *testing.T) {
 	}
 
 	validateGraph(t, g, expectedNodes, expectedLinks, expectedRoutes)
+
+	expectedRoutes = map[RouteKey]RouteTestSpec{
+		RouteKey{"192.168.1.1:1", "192.168.1.4:1"}: RouteTestSpec{
+			Count: 1,
+			Path: []string{
+				"192.168.1.1",
+				"192.168.1.4",
+			},
+		},
+	}
+
+	expectedLinks = map[NetworkLinkKey]int{
+		NetworkLinkKey{"192.168.1.1", "192.168.1.4"}: 1,
+	}
+
+	expectedNodes = map[string]int{
+		"192.168.1.1": 1,
+		"192.168.1.4": 1,
+	}
+
+	for routeKey, rSpec := range expectedRoutes {
+		src, _ := net.ResolveUDPAddr("udp", routeKey.Src)
+		dst, _ := net.ResolveUDPAddr("udp", routeKey.Dst)
+
+		for i := 0; i < rSpec.Count; i++ {
+			g.IncrRoute(*src, *dst, rSpec.Path)
+		}
+	}
+
+	validateGraph(t, g, expectedNodes, expectedLinks, expectedRoutes)
+
+	if g.GetRouteCount() != 1 {
+		t.Error("conflicting routes!")
+	}
 }
