@@ -1,6 +1,9 @@
 package main
 
 import (
+	"encoding/json"
+	"flag"
+	"net/http"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -9,25 +12,11 @@ import (
 	"github.com/jacksontj/dnms/traceroute"
 )
 
-func tracerouteExample() {
-	options := traceroute.TracerouteOptions{}
-	options.SetDstPort(33434) // TODO: config
-
-	ret, err := traceroute.Traceroute(
-		"www.google.com",
-		&options,
-	)
-	if err != nil {
-		logrus.Infof("Traceroute err: %v", err)
-	} else {
-		logrus.Infof("Traceroute: %v", ret)
-
-	}
-}
-
+// This goroutine is responsible for mapping app peers on the network
 func mapper(routeMap *RouteMap, g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
-	srcPort := 33435
-	dstName := "173.194.72.147" // a specific IP-- so we can test
+	srcPortStart := 33435
+	srcPortEnd := 33440
+
 	for {
 		nodes := mlist.Members()
 
@@ -40,53 +29,62 @@ func mapper(routeMap *RouteMap, g *graph.NetworkGraph, mlist *memberlist.Memberl
 			// Otherwise, lets do some stuff
 			logrus.Infof("get routes to peer: %v %v", node.Addr, node)
 
-			options := traceroute.TracerouteOptions{}
-			options.SetSrcPort(srcPort) // TODO: config
-			options.SetDstPort(33434)   // TODO: config
+			for srcPort := srcPortStart; srcPort < srcPortEnd; srcPort++ {
 
-			ret, err := traceroute.Traceroute(
-				dstName,
-				&options,
-			)
-			if err != nil {
-				logrus.Infof("Traceroute err: %v", err)
-				continue
-			}
+				options := traceroute.TracerouteOptions{}
+				options.SetSrcPort(srcPort)        // TODO: config
+				options.SetDstPort(int(node.Port)) // TODO: config
 
-			logrus.Info("Traceroute: complete")
-
-			path := make([]string, 0, len(ret.Hops))
-
-			for _, hop := range ret.Hops {
-				path = append(path, hop.AddressString())
-			}
-
-			//src, _ := net.ResolveUDPAddr("udp", "localhost:33434")
-			//dst, _ := net.ResolveUDPAddr("udp", "www.google.com:33434")
-
-			currRoute := routeMap.GetRouteOption(srcPort, dstName)
-
-			// If we don't have a current route, or the paths differ-- lets update
-			if currRoute == nil || !currRoute.SamePath(path) {
-				// Add new one
-				routeMap.UpdateRouteOption(srcPort, dstName, g.IncrRoute(path))
-
-				// Remove old one if it exists
-				if currRoute != nil {
-					g.DecrRoute(currRoute.Hops())
+				ret, err := traceroute.Traceroute(
+					node.Addr.String(), // TODO: take the IP direct
+					&options,
+				)
+				if err != nil {
+					logrus.Infof("Traceroute err: %v", err)
+					continue
 				}
-			}
 
-			// TODO configurable rate
-			time.Sleep(time.Second * 5)
+				logrus.Infof("Traceroute %d -> %s: complete", srcPort, node.Addr.String())
+
+				path := make([]string, 0, len(ret.Hops))
+
+				for _, hop := range ret.Hops {
+					path = append(path, hop.AddressString())
+				}
+
+				currRoute := routeMap.GetRouteOption(srcPort, node.Addr.String())
+
+				// If we don't have a current route, or the paths differ-- lets update
+				if currRoute == nil || !currRoute.SamePath(path) {
+					// Add new one
+					routeMap.UpdateRouteOption(srcPort, node.Addr.String(), g.IncrRoute(path))
+
+					// Remove old one if it exists
+					if currRoute != nil {
+						g.DecrRoute(currRoute.Hops())
+					}
+				}
+
+				// TODO configurable rate
+				time.Sleep(time.Second * 1)
+			}
 		}
 	}
 
 }
 
 func main() {
+	// Some CLI args for better testing
+
+	advertiseStr := flag.String("gossipAddr", "", "address to advertise gossip on")
+	peerStr := flag.String("peer", "", "address to gossip with")
+
+	flag.Parse()
+
 	g := graph.Create()
 	routeMap := NewRouteMap()
+
+	// TODO: wire up delegate to delete all entries in routeMap for node that has left
 
 	/*
 		This is the main daemon. Which has the following responsibilities:
@@ -99,15 +97,38 @@ func main() {
 	// #TODO: load from a config file
 	cfg := memberlist.DefaultLANConfig()
 
+	// TODO: load from config
+	cfg.BindPort = 33434
+	cfg.AdvertisePort = 33434
+
+	if *advertiseStr != "" {
+		cfg.AdvertiseAddr = *advertiseStr
+		logrus.Infof("addr: %v", *advertiseStr)
+	}
+
 	mlist, err := memberlist.Create(cfg)
 
 	if err != nil {
 		logrus.Fatalf("Unable to create memberlist: %v", err)
 	}
 
-	mlist.Join([]string{"127.0.0.1:55555"})
+	mlist.Join([]string{*peerStr})
 
 	go mapper(routeMap, g, mlist)
+
+	// TODO: API endpoint
+	// Create helpful HTTP endpoint for debugging
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		ret, err := json.Marshal(routeMap.NodeRouteMap)
+		if err != nil {
+			logrus.Errorf("Unable to marshal graph: %v", err)
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(ret)
+		}
+	})
+
+	go http.ListenAndServe(":12345", nil)
 
 	for {
 		time.Sleep(time.Second)

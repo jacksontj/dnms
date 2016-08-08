@@ -2,21 +2,23 @@ package main
 
 // Map for port + node -> route
 import (
+	"strconv"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/jacksontj/dnms/graph"
 )
 
 type RouteMap struct {
 	// "srcPort:nodename" -> route
-	nodeRouteMap map[string]*graph.NetworkRoute
+	NodeRouteMap map[string]*graph.NetworkRoute
 
-	// nodename -> nodeRouteMap-Key
+	// nodename -> NodeRouteMap-Key
 	nodeKeyMap map[string]map[string]interface{}
 }
 
 func NewRouteMap() *RouteMap {
 	return &RouteMap{
-		nodeRouteMap: make(map[string]*graph.NetworkRoute),
+		NodeRouteMap: make(map[string]*graph.NetworkRoute),
 		nodeKeyMap:   make(map[string]map[string]interface{}),
 	}
 }
@@ -41,22 +43,24 @@ func (r *RouteMap) RemoveNodeKey(name, key string) {
 }
 
 func (r *RouteMap) GetRouteOption(srcPort int, dst string) *graph.NetworkRoute {
-	key := string(srcPort) + ":" + dst
+	key := strconv.Itoa(srcPort) + ":" + dst
 
-	route, _ := r.nodeRouteMap[key]
+	route, _ := r.NodeRouteMap[key]
 	return route
 }
 
 //
 func (r *RouteMap) UpdateRouteOption(srcPort int, dst string, newRoute *graph.NetworkRoute) {
-	key := string(srcPort) + ":" + dst
+	key := strconv.Itoa(srcPort) + ":" + dst
 
-	route, ok := r.nodeRouteMap[key]
+	route, ok := r.NodeRouteMap[key]
 
 	// if it doesn't exist, lets make it
 	if !ok || route != newRoute {
-		r.nodeRouteMap[key] = newRoute
+		r.NodeRouteMap[key] = newRoute
 	}
+
+	// TODO: handle case where it changed
 
 	r.AddNodeKey(dst, key)
 }
@@ -69,6 +73,6 @@ func (r *RouteMap) RemoveDst(dst string) {
 		return
 	}
 	for key := range nodeKeys {
-		delete(r.nodeRouteMap, key)
+		delete(r.NodeRouteMap, key)
 	}
 }

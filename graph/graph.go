@@ -12,47 +12,47 @@ import (
 // TODO: maintain some maps for easier lookup
 type NetworkGraph struct {
 	// nodeName -> Node
-	nodesMap map[string]*NetworkNode
+	NodesMap map[string]*NetworkNode
 
 	// TODO: change linkKey to string
 	// nodeName,nodeName -> NetworkLink
-	linksMap map[NetworkLinkKey]*NetworkLink
+	LinksMap map[NetworkLinkKey]*NetworkLink
 
-	routesMap map[string]*NetworkRoute
+	RoutesMap map[string]*NetworkRoute
 }
 
 func Create() *NetworkGraph {
 	return &NetworkGraph{
-		nodesMap:  make(map[string]*NetworkNode),
-		linksMap:  make(map[NetworkLinkKey]*NetworkLink),
-		routesMap: make(map[string]*NetworkRoute),
+		NodesMap:  make(map[string]*NetworkNode),
+		LinksMap:  make(map[NetworkLinkKey]*NetworkLink),
+		RoutesMap: make(map[string]*NetworkRoute),
 	}
 }
 
 func (g *NetworkGraph) IncrNode(name string) *NetworkNode {
-	n, ok := g.nodesMap[name]
+	n, ok := g.NodesMap[name]
 	// if this one doesn't exist, lets add it
 	if !ok {
 		n = &NetworkNode{
 			Name: name,
 		}
-		g.nodesMap[name] = n
+		g.NodesMap[name] = n
 	}
 	n.RefCount++
 	return n
 }
 
 func (g *NetworkGraph) GetNode(name string) *NetworkNode {
-	n, _ := g.nodesMap[name]
+	n, _ := g.NodesMap[name]
 	return n
 }
 
 func (g *NetworkGraph) GetNodeCount() int {
-	return len(g.nodesMap)
+	return len(g.NodesMap)
 }
 
 func (g *NetworkGraph) DecrNode(name string) {
-	n, ok := g.nodesMap[name]
+	n, ok := g.NodesMap[name]
 
 	if !ok {
 		logrus.Warningf("Attempted to remove node with ip %v which wasn't in the graph", name)
@@ -61,19 +61,19 @@ func (g *NetworkGraph) DecrNode(name string) {
 
 	n.RefCount--
 	if n.RefCount == 0 {
-		delete(g.nodesMap, name)
+		delete(g.NodesMap, name)
 	}
 }
 
 func (g *NetworkGraph) IncrLink(src, dst string) *NetworkLink {
 	key := NetworkLinkKey{src, dst}
-	l, ok := g.linksMap[key]
+	l, ok := g.LinksMap[key]
 	if !ok {
 		l = &NetworkLink{
 			Src: g.IncrNode(src),
 			Dst: g.IncrNode(dst),
 		}
-		g.linksMap[key] = l
+		g.LinksMap[key] = l
 	}
 	l.RefCount++
 	return l
@@ -81,17 +81,17 @@ func (g *NetworkGraph) IncrLink(src, dst string) *NetworkLink {
 
 func (g *NetworkGraph) GetLink(src, dst string) *NetworkLink {
 	key := NetworkLinkKey{src, dst}
-	l, _ := g.linksMap[key]
+	l, _ := g.LinksMap[key]
 	return l
 }
 
 func (g *NetworkGraph) GetLinkCount() int {
-	return len(g.linksMap)
+	return len(g.LinksMap)
 }
 
 func (g *NetworkGraph) DecrLink(src, dst string) {
 	key := NetworkLinkKey{src, dst}
-	l, ok := g.linksMap[key]
+	l, ok := g.LinksMap[key]
 	if !ok {
 		logrus.Warningf("Attempted to remove link %v which wasn't in the graph", key)
 		return
@@ -102,7 +102,7 @@ func (g *NetworkGraph) DecrLink(src, dst string) {
 	// decrement ourselves
 	l.RefCount--
 	if l.RefCount == 0 {
-		delete(g.linksMap, key)
+		delete(g.LinksMap, key)
 	}
 }
 
@@ -119,7 +119,7 @@ func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
 	key := g.pathKey(hops)
 
 	// check if we have a route for this already
-	route, ok := g.routesMap[key]
+	route, ok := g.RoutesMap[key]
 	// if we don't have it, lets make it
 	if !ok {
 		logrus.Infof("New Route: key=%s %v", key, hops)
@@ -134,7 +134,7 @@ func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
 		route = &NetworkRoute{
 			Path: path,
 		}
-		g.routesMap[key] = route
+		g.RoutesMap[key] = route
 	}
 
 	// increment route's refcount
@@ -144,17 +144,17 @@ func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
 }
 
 func (g *NetworkGraph) GetRoute(hops []string) *NetworkRoute {
-	r, _ := g.routesMap[g.pathKey(hops)]
+	r, _ := g.RoutesMap[g.pathKey(hops)]
 	return r
 }
 
 func (g *NetworkGraph) GetRouteCount() int {
-	return len(g.routesMap)
+	return len(g.RoutesMap)
 }
 
 func (g *NetworkGraph) DecrRoute(hops []string) {
 	key := g.pathKey(hops)
-	r, ok := g.routesMap[key]
+	r, ok := g.RoutesMap[key]
 	if !ok {
 		logrus.Warningf("Attempted to remove route %v which wasn't in the graph", key)
 		return
@@ -170,6 +170,6 @@ func (g *NetworkGraph) DecrRoute(hops []string) {
 
 	r.RefCount--
 	if r.RefCount == 0 {
-		delete(g.routesMap, key)
+		delete(g.RoutesMap, key)
 	}
 }
