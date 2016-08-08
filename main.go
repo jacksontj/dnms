@@ -15,7 +15,7 @@ import (
 // This goroutine is responsible for mapping app peers on the network
 func mapper(routeMap *RouteMap, g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
 	srcPortStart := 33435
-	srcPortEnd := 33440
+	srcPortEnd := 33450
 
 	for {
 		nodes := mlist.Members()

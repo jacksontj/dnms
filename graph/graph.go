@@ -160,16 +160,16 @@ func (g *NetworkGraph) DecrRoute(hops []string) {
 		return
 	}
 
-	// decrement all the links/nodes as well
-	for i, node := range r.Path {
-		g.DecrNode(node.Name)
-		if i-1 > 0 {
-			g.DecrLink(r.Path[i-1].Name, node.Name)
-		}
-	}
-
 	r.RefCount--
 	if r.RefCount == 0 {
+		// decrement all the links/nodes as well
+		for i, node := range r.Path {
+			g.DecrNode(node.Name)
+			if i-1 > 0 {
+				g.DecrLink(r.Path[i-1].Name, node.Name)
+			}
+		}
+
 		delete(g.RoutesMap, key)
 	}
 }
