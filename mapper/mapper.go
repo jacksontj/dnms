@@ -47,6 +47,19 @@ func (m *Mapper) AddPeer(p Peer) {
 func (m *Mapper) RemovePeer(p Peer) {
 	_, ok := m.peerMap[p.Name]
 	if ok {
+		// TODO: better-- at least its all encapsualated here
+		// Remove routes from routemap
+		for _, route := range m.RouteMap.RemoveDst(p.Name) {
+			// Right now there is a race in removeDst -- which should get fixed
+			// We can either serialize removal of peers in a goroutine, or do
+			// locking (goroutine seems best)
+			if route == nil {
+				logrus.Infof("route was nil in removal???")
+				continue
+			}
+			m.Graph.DecrRoute(route.Hops())
+		}
+		// delete the peer
 		delete(m.peerMap, p.Name)
 	} else {
 		logrus.Warning("Mapper asked to remove peer that doesn't exists: %v", p)

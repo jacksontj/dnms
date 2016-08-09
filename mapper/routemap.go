@@ -99,6 +99,7 @@ func (r *RouteMap) UpdateRouteOption(srcPort int, dst string, newRoute *graph.Ne
 	r.AddNodeKey(dst, key)
 }
 
+// TODO: make iterator? This isn't safe concurrency-wise right now
 // TODO: do our own route refcounting
 // Remove all route options associated with dst
 func (r *RouteMap) RemoveDst(dst string) []*graph.NetworkRoute {

@@ -22,8 +22,6 @@ func main() {
 	m := mapper.NewMapper()
 	m.Start()
 
-	routeMap := mapper.NewRouteMap()
-
 	// #TODO: load from a config file
 	cfg := memberlist.DefaultLANConfig()
 
@@ -62,7 +60,7 @@ func main() {
 	// TODO: API endpoint
 	// Create helpful HTTP endpoint for debugging
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		ret, err := json.Marshal(routeMap.NodeRouteMap)
+		ret, err := json.Marshal(m.RouteMap.NodeRouteMap)
 		if err != nil {
 			logrus.Errorf("Unable to marshal graph: %v", err)
 		} else {
