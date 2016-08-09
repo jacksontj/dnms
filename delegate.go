@@ -30,8 +30,6 @@ func (d *DNMSDelegate) NodeMeta(limit int) []byte {
 // so would block the entire UDP packet receive loop. Additionally, the byte
 // slice may be modified after the call returns, so it should be copied if needed.
 func (d *DNMSDelegate) NotifyMsg(buf []byte) {
-	logrus.Infof("Got msg: %v", buf)
-
 	msgType := messageType(buf[0])
 	buf = buf[1:]
 
@@ -46,6 +44,28 @@ func (d *DNMSDelegate) NotifyMsg(buf []byte) {
 		}
 		logrus.Infof("Got a ping on %v", p)
 
+		msg := []byte("ack")
+		buf := make([]byte, 1, len(msg)+1)
+		buf[0] = byte(8) // TODO: add sendFrom API to memberlist
+		buf = append(buf, msg...)
+
+		// TODO: must have same source port :( This is either going to require work
+		// to memberlist, or a separate set of ports for our messages vs gossip
+		// or that ACKs go through an unknown path (probably not preferred -- consistent is better)
+		/*
+			// write return packet
+			RemoteEP := net.UDPAddr{IP: net.ParseIP(p.SrcName), Port: int(p.SrcPort)}
+			conn, err := net.DialUDP("udp", &net.UDPAddr{}, &RemoteEP)
+			if err != nil {
+				// handle error
+				logrus.Errorf("unable to connect to peer: %v", err)
+				return
+			}
+			// TODO: configurable time
+			//conn.SetDeadline(time.Now().Add(time.Second))
+
+			conn.Write(buf)
+		*/
 	default:
 		logrus.Infof("Unknown messageType=%d", msgType)
 

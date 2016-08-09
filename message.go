@@ -13,6 +13,9 @@ type ping struct {
 	// Node is sent so the target can verify they are
 	// the intended recipient. This is to protect again an agent
 	// restart with a new name.
-	Name string
-	Path []string
+	SrcName string
+	SrcPort int
+
+	DstName string
+	Path    []string
 }

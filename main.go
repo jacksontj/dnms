@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
@@ -93,8 +95,10 @@ func pinger(routeMap *RouteMap, mlist *memberlist.Memberlist) {
 				logrus.Infof("Ping srcPort=%d dst=%s", srcPort, routeKeyParts[1])
 
 				p := ping{
-					Name: node.Addr.String(),
-					Path: routeMap.GetRoute(routeKey).Hops(),
+					SrcName: mlist.LocalNode().Addr.String(),
+					SrcPort: srcPort,
+					DstName: node.Addr.String(),
+					Path:    routeMap.GetRoute(routeKey).Hops(),
 				}
 				// TODO: major cleanup to encapsulate all this message sending
 				// Encode as a user message
@@ -125,11 +129,10 @@ func pinger(routeMap *RouteMap, mlist *memberlist.Memberlist) {
 				// TODO: figure out how to get the message back...
 				// seems that I might have to add some methods to get at `WriteToUDP`
 				// in memberlist
-				// fmt.FprintF Invokes the conn.Write() method and converts the string to a byte slice
 				conn.Write(buf)
 
 				// TODO: get a response from the ping
-				//fmt.Println(ioutil.ReadAll(conn))
+				fmt.Println(ioutil.ReadAll(conn))
 				conn.Close()
 				time.Sleep(time.Second)
 			}
