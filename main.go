@@ -96,6 +96,7 @@ func pinger(routeMap *RouteMap, mlist *memberlist.Memberlist) {
 					SrcName: mlist.LocalNode().Addr.String(),
 					SrcPort: srcPort,
 					DstName: node.Addr.String(),
+					DstPort: int(node.Port),
 					Path:    routeMap.GetRoute(routeKey).Hops(),
 				}
 				// TODO: major cleanup to encapsulate all this message sending

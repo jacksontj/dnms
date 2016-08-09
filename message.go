@@ -10,12 +10,10 @@ const (
 )
 
 type ping struct {
-	// Node is sent so the target can verify they are
-	// the intended recipient. This is to protect again an agent
-	// restart with a new name.
 	SrcName string
 	SrcPort int
 
 	DstName string
+	DstPort int
 	Path    []string
 }
