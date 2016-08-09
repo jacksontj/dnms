@@ -2,6 +2,7 @@
 Create a visual representation of the various DAGs defined
 '''
 
+import sys
 import requests
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -16,7 +17,7 @@ if __name__ == '__main__':
 
     nodes = {}
 
-    for routeKey, routeMap in requests.get('http://localhost:12345').json().iteritems():
+    for routeKey, routeMap in requests.get(sys.argv[1]).json().iteritems():
         for i, node in enumerate(routeMap['Path']):
             g.add_node(node['Name'])
             labels['nodes'][node['Name']] = node['Name']
@@ -25,8 +26,6 @@ if __name__ == '__main__':
                 labels['edges'][(routeMap['Path'][i-1]['Name'], routeMap['Path'][i]['Name'])] = (routeMap['Path'][i-1]['Name'], routeMap['Path'][i]['Name'])
 
 
-    #pos = nx.spring_layout(g)
-    #nx.draw(g, pos=pos)
     nx.draw_networkx(g, with_labels=True)
 
     # add labels
@@ -34,5 +33,8 @@ if __name__ == '__main__':
     #nx.draw_networkx_edge_labels(g, pos, labels['edges'])
 
     # write out the graph
-    plt.savefig('dag.png')
+    plt.savefig(
+        'topology.png',
+        dpi=400.0,
+    )
     plt.show()  # in case people have the required libraries to make it happen
