@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/hashicorp/memberlist"
 	"github.com/jacksontj/dnms/graph"
 	"github.com/jacksontj/dnms/traceroute"
+	"github.com/jacksontj/memberlist"
 )
 
 // This goroutine is responsible for mapping app peers on the network
@@ -131,7 +131,13 @@ func pinger(routeMap *RouteMap, mlist *memberlist.Memberlist) {
 				conn.Write(buf)
 
 				// TODO: get a response from the ping
-				//fmt.Println(ioutil.ReadAll(conn))
+				retBuf := make([]byte, 2048)
+				readRet, err := conn.Read(retBuf)
+				if err == nil {
+					logrus.Infof("AckMsg %s", string(retBuf[0:readRet]))
+				} else {
+					logrus.Errorf("Some error %v %v\n", err, readRet)
+				}
 				conn.Close()
 				time.Sleep(time.Second)
 			}
@@ -178,6 +184,7 @@ func main() {
 	}
 
 	mlist, err := memberlist.Create(cfg)
+	delegate.Mlist = mlist
 
 	if err != nil {
 		logrus.Fatalf("Unable to create memberlist: %v", err)

@@ -1,14 +1,18 @@
 package main
 
 import (
+	"net"
+
 	"github.com/Sirupsen/logrus"
-	"github.com/hashicorp/memberlist"
 	"github.com/jacksontj/dnms/graph"
+	"github.com/jacksontj/memberlist"
 )
 
 type DNMSDelegate struct {
 	Graph    *graph.NetworkGraph
 	RouteMap *RouteMap
+
+	Mlist *memberlist.Memberlist
 }
 
 func NewDNMSDelegate(g *graph.NetworkGraph, r *RouteMap) *DNMSDelegate {
@@ -55,23 +59,13 @@ func (d *DNMSDelegate) NotifyMsg(buf []byte) {
 		buf[0] = byte(8) // TODO: add sendFrom API to memberlist
 		buf = append(buf, msg...)
 
-		// TODO: must have same source port :( This is either going to require work
-		// to memberlist, or a separate set of ports for our messages vs gossip
-		// or that ACKs go through an unknown path (probably not preferred -- consistent is better)
-		/*
-			// write return packet
-			RemoteEP := net.UDPAddr{IP: net.ParseIP(p.SrcName), Port: int(p.SrcPort)}
-			conn, err := net.DialUDP("udp", &net.UDPAddr{}, &RemoteEP)
-			if err != nil {
-				// handle error
-				logrus.Errorf("unable to connect to peer: %v", err)
-				return
-			}
-			// TODO: configurable time
-			//conn.SetDeadline(time.Now().Add(time.Second))
-
-			conn.Write(buf)
-		*/
+		d.Mlist.SendToUDPPort(
+			&net.UDPAddr{
+				IP:   net.ParseIP(p.SrcName),
+				Port: p.SrcPort,
+			},
+			buf,
+		)
 	default:
 		logrus.Infof("Unknown messageType=%d", msgType)
 
