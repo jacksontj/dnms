@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
@@ -132,7 +130,7 @@ func pinger(routeMap *RouteMap, mlist *memberlist.Memberlist) {
 				conn.Write(buf)
 
 				// TODO: get a response from the ping
-				fmt.Println(ioutil.ReadAll(conn))
+				//fmt.Println(ioutil.ReadAll(conn))
 				conn.Close()
 				time.Sleep(time.Second)
 			}

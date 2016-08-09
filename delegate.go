@@ -44,6 +44,12 @@ func (d *DNMSDelegate) NotifyMsg(buf []byte) {
 		}
 		logrus.Infof("Got a ping on %v", p)
 
+		// TODO: send the ack back the same way it came (if possible??)
+		// from some limited testing this seems VERY unreliable-- we should either
+		// just send it back however or from a specific port
+		routeKey, ok := d.RouteMap.FindRoute(p.Path)
+		logrus.Infof("Reverse route? routeKey=%s ok=%v", routeKey, ok)
+
 		msg := []byte("ack")
 		buf := make([]byte, 1, len(msg)+1)
 		buf[0] = byte(8) // TODO: add sendFrom API to memberlist

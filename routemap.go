@@ -28,6 +28,15 @@ func (r *RouteMap) GetRoute(key string) *graph.NetworkRoute {
 	return route
 }
 
+func (r *RouteMap) FindRoute(path []string) (string, bool) {
+	for key, route := range r.NodeRouteMap {
+		if route.SamePathReverse(path) {
+			return key, true
+		}
+	}
+	return "", false
+}
+
 // TODO: make this spawn the goroutine instead of the caller?
 func (r *RouteMap) IterRoutes(name string, keysChan chan string) {
 	usedRoutes := make(map[*graph.NetworkRoute]interface{})
