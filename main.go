@@ -3,7 +3,10 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -66,7 +69,69 @@ func mapper(routeMap *RouteMap, g *graph.NetworkGraph, mlist *memberlist.Memberl
 				}
 
 				// TODO configurable rate
-				time.Sleep(time.Second * 1)
+				time.Sleep(time.Second * 5)
+			}
+		}
+	}
+}
+
+func pinger(routeMap *RouteMap, mlist *memberlist.Memberlist) {
+	for {
+		time.Sleep(time.Second)
+		nodes := mlist.Members()
+
+		for _, node := range nodes {
+			// if this is ourselves, skip!
+			if node == mlist.LocalNode() {
+				continue
+			}
+			c := make(chan string)
+			go routeMap.IterRoutes(node.Addr.String(), c)
+			for routeKey := range c {
+				routeKeyParts := strings.SplitN(routeKey, ":", 2)
+				srcPort, _ := strconv.Atoi(routeKeyParts[0])
+				logrus.Infof("Ping srcPort=%d dst=%s", srcPort, routeKeyParts[1])
+
+				p := ping{
+					Name: node.Addr.String(),
+					Path: routeMap.GetRoute(routeKey).Hops(),
+				}
+				// TODO: major cleanup to encapsulate all this message sending
+				// Encode as a user message
+				encodedBuf, err := encode(pingMsg, p)
+				if err != nil {
+					logrus.Infof("Unable to encode pingMsg: %v", err)
+					continue
+				}
+				msg := encodedBuf.Bytes()
+				buf := make([]byte, 1, len(msg)+1)
+				buf[0] = byte(8) // TODO: add sendFrom API to memberlist
+				buf = append(buf, msg...)
+
+				LocalAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:"+routeKeyParts[0])
+				if err != nil {
+					logrus.Errorf("unable to resolve source addr %v", err)
+				}
+				RemoteEP := net.UDPAddr{IP: node.Addr, Port: int(node.Port)}
+				conn, err := net.DialUDP("udp", LocalAddr, &RemoteEP)
+				if err != nil {
+					// handle error
+					logrus.Errorf("unable to connect to peer: %v", err)
+					continue
+				}
+				// TODO: configurable time
+				//conn.SetDeadline(time.Now().Add(time.Second))
+
+				// TODO: figure out how to get the message back...
+				// seems that I might have to add some methods to get at `WriteToUDP`
+				// in memberlist
+				// fmt.FprintF Invokes the conn.Write() method and converts the string to a byte slice
+				conn.Write(buf)
+
+				// TODO: get a response from the ping
+				//fmt.Println(ioutil.ReadAll(conn))
+				conn.Close()
+				time.Sleep(time.Second)
 			}
 		}
 	}
@@ -97,6 +162,10 @@ func main() {
 	// #TODO: load from a config file
 	cfg := memberlist.DefaultLANConfig()
 
+	delegate := NewDNMSDelegate(g, routeMap)
+	cfg.Delegate = delegate
+	cfg.Events = delegate
+
 	// TODO: load from config
 	cfg.BindPort = 33434
 	cfg.AdvertisePort = 33434
@@ -115,6 +184,7 @@ func main() {
 	mlist.Join([]string{*peerStr})
 
 	go mapper(routeMap, g, mlist)
+	go pinger(routeMap, mlist)
 
 	// TODO: API endpoint
 	// Create helpful HTTP endpoint for debugging

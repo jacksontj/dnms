@@ -23,6 +23,31 @@ func NewRouteMap() *RouteMap {
 	}
 }
 
+func (r *RouteMap) GetRoute(key string) *graph.NetworkRoute {
+	route, _ := r.NodeRouteMap[key]
+	return route
+}
+
+// TODO: make this spawn the goroutine instead of the caller?
+func (r *RouteMap) IterRoutes(name string, keysChan chan string) {
+	usedRoutes := make(map[*graph.NetworkRoute]interface{})
+
+	nodeMap, ok := r.nodeKeyMap[name]
+	// If there is something, iterate over them and stick the key down the channel
+	if ok {
+		for key := range nodeMap {
+			route, _ := r.NodeRouteMap[key]
+			if _, ok := usedRoutes[route]; !ok {
+				keysChan <- key
+				usedRoutes[route] = struct{}{}
+			}
+
+		}
+	}
+
+	close(keysChan)
+}
+
 func (r *RouteMap) AddNodeKey(name, key string) {
 	nMap, ok := r.nodeKeyMap[name]
 	if !ok {

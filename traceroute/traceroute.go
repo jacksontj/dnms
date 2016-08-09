@@ -8,8 +8,6 @@ import (
 	"net"
 	"syscall"
 	"time"
-
-	"github.com/Sirupsen/logrus"
 )
 
 // Return the first non-loopback address as a 4 byte IP address. This address
@@ -141,7 +139,7 @@ func Traceroute(dest string, options *TracerouteOptions, c ...chan TracerouteHop
 			err = syscall.Bind(sendSocket, &syscall.SockaddrInet4{Port: options.SrcPort(), Addr: socketAddr})
 			// TODO: non-fatal error
 			if err != nil {
-				logrus.Fatalf("err binding: %v", err)
+				return result, err
 			}
 		}
 

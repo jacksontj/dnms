@@ -10,6 +10,7 @@ type RouteKey struct {
 // then we could potentially have both directions
 // TODO: TTL for routes? If we just start up we don't want to have to re-ping the
 // world before we are useful
+// TODO: stats about route health
 type NetworkRoute struct {
 	Path []*NetworkNode
 
