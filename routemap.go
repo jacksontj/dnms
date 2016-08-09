@@ -8,6 +8,7 @@ import (
 	"github.com/jacksontj/dnms/graph"
 )
 
+// TODO: do our own route refcounting (up and down)
 type RouteMap struct {
 	// "srcPort:nodename" -> route
 	NodeRouteMap map[string]*graph.NetworkRoute
@@ -97,14 +98,19 @@ func (r *RouteMap) UpdateRouteOption(srcPort int, dst string, newRoute *graph.Ne
 	r.AddNodeKey(dst, key)
 }
 
+// TODO: do our own route refcounting
 // Remove all route options associated with dst
-func (r *RouteMap) RemoveDst(dst string) {
+func (r *RouteMap) RemoveDst(dst string) []*graph.NetworkRoute {
 	nodeKeys, ok := r.nodeKeyMap[dst]
 	if !ok {
 		logrus.Warningf("Removing route options for a dst that isn't in the map: %s", dst)
-		return
+		return nil
 	}
+	ret := make([]*graph.NetworkRoute, 0, len(nodeKeys))
 	for key := range nodeKeys {
+		v, _ := r.NodeRouteMap[key]
+		ret = append(ret, v)
 		delete(r.NodeRouteMap, key)
 	}
+	return ret
 }

@@ -15,5 +15,17 @@ type ping struct {
 
 	DstName string
 	DstPort int
-	Path    []string
+	// TODO: don't send? seems that the peers don't usually share paths
+	Path []string
+
+	// Note: we can't use the times anywhere but where they where measured-- due
+	// to clock drift
+	PingTimeNS int64
+}
+
+type ack struct {
+	PingTimeNS int64
+
+	// TODO: don't send? seems that the peers don't usually share paths
+	Path []string
 }

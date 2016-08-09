@@ -18,7 +18,7 @@ import (
 // This goroutine is responsible for mapping app peers on the network
 func mapper(routeMap *RouteMap, g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
 	srcPortStart := 33435
-	srcPortEnd := 33450
+	srcPortEnd := 33500
 
 	for {
 		nodes := mlist.Members()
@@ -88,16 +88,22 @@ func pinger(routeMap *RouteMap, mlist *memberlist.Memberlist) {
 			c := make(chan string)
 			go routeMap.IterRoutes(node.Addr.String(), c)
 			for routeKey := range c {
+				route := routeMap.GetRoute(routeKey)
+				// TODO: better
+				if route == nil {
+					continue
+				}
 				routeKeyParts := strings.SplitN(routeKey, ":", 2)
 				srcPort, _ := strconv.Atoi(routeKeyParts[0])
 				logrus.Infof("Ping srcPort=%d dst=%s", srcPort, routeKeyParts[1])
 
 				p := ping{
-					SrcName: mlist.LocalNode().Addr.String(),
-					SrcPort: srcPort,
-					DstName: node.Addr.String(),
-					DstPort: int(node.Port),
-					Path:    routeMap.GetRoute(routeKey).Hops(),
+					SrcName:    mlist.LocalNode().Addr.String(),
+					SrcPort:    srcPort,
+					DstName:    node.Addr.String(),
+					DstPort:    int(node.Port),
+					Path:       route.Hops(),
+					PingTimeNS: time.Now().UnixNano(),
 				}
 				// TODO: major cleanup to encapsulate all this message sending
 				// Encode as a user message
@@ -123,7 +129,7 @@ func pinger(routeMap *RouteMap, mlist *memberlist.Memberlist) {
 					continue
 				}
 				// TODO: configurable time
-				//conn.SetDeadline(time.Now().Add(time.Second))
+				conn.SetDeadline(time.Now().Add(time.Second))
 
 				// TODO: figure out how to get the message back...
 				// seems that I might have to add some methods to get at `WriteToUDP`
@@ -132,15 +138,33 @@ func pinger(routeMap *RouteMap, mlist *memberlist.Memberlist) {
 
 				// TODO: get a response from the ping
 				retBuf := make([]byte, 2048)
-				conn.Read(retBuf)
-				//readRet, err := conn.Read(retBuf)
-				/*
-					if err == nil {
-						logrus.Infof("AckMsg %s", string(retBuf[0:readRet]))
-					} else {
-						logrus.Errorf("Some error %v %v\n", err, readRet)
+				readRet, err := conn.Read(retBuf)
+				// if there was a response
+				if readRet > 0 {
+					// Note: throwing away the first byte-- as its the memberlist header
+					msgType := messageType(retBuf[1])
+					retBuf = retBuf[2:]
+
+					switch msgType {
+
+					case ackMsg:
+						a := ack{}
+						err := decode(retBuf, &a)
+						if err != nil {
+							logrus.Warning("Unable to decode message: %v", err)
+							continue
+						} else {
+							//logrus.Infof("took %v ns): %v", time.Now().UnixNano()-a.PingTimeNS, a)
+							// TODO: use the ACK for something
+						}
+
+					default:
+						logrus.Infof("Got unknown response type from ack: %v", msgType)
 					}
-				*/
+				} else {
+					// TODO: use the absense of ACK for something
+					logrus.Infof("ACK timeout")
+				}
 				conn.Close()
 				time.Sleep(time.Second)
 			}
@@ -159,16 +183,6 @@ func main() {
 
 	g := graph.Create()
 	routeMap := NewRouteMap()
-
-	// TODO: wire up delegate to delete all entries in routeMap for node that has left
-
-	/*
-		This is the main daemon. Which has the following responsibilities:
-			- traceroute: Graph the network
-			- ping: keep track of latency/jitter/loss across links
-			- aggregate: to centralized location for better fault detection
-			- coordinate: split the above work to scale better
-	*/
 
 	// #TODO: load from a config file
 	cfg := memberlist.DefaultLANConfig()

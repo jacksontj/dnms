@@ -54,17 +54,23 @@ func (d *DNMSDelegate) NotifyMsg(buf []byte) {
 		//routeKey, ok := d.RouteMap.FindRoute(p.Path)
 		//logrus.Infof("Reverse route? routeKey=%s ok=%v", routeKey, ok)
 
-		msg := []byte("ack")
-		buf := make([]byte, 1, len(msg)+1)
-		buf[0] = byte(8) // TODO: add sendFrom API to memberlist
-		buf = append(buf, msg...)
+		a := ack{
+			PingTimeNS: p.PingTimeNS,
+		}
+		// TODO: major cleanup to encapsulate all this message sending
+		// Encode as a user message
+		encodedBuf, err := encode(ackMsg, a)
+		if err != nil {
+			logrus.Infof("Unable to encode pingMsg: %v", err)
+			return
+		}
 
 		d.Mlist.SendToUDPPort(
 			&net.UDPAddr{
 				IP:   net.ParseIP(p.SrcName),
 				Port: p.SrcPort,
 			},
-			buf,
+			encodedBuf.Bytes(),
 		)
 	default:
 		logrus.Infof("Unknown messageType=%d", msgType)
@@ -110,6 +116,9 @@ func (d *DNMSDelegate) NotifyJoin(n *memberlist.Node) {
 // The Node argument must not be modified.
 func (d *DNMSDelegate) NotifyLeave(n *memberlist.Node) {
 	logrus.Infof("Node left %s", n.Addr.String())
+	for _, route := range d.RouteMap.RemoveDst(n.Addr.String()) {
+		d.Graph.DecrRoute(route.Hops())
+	}
 }
 
 // NotifyUpdate is invoked when a node is detected to have

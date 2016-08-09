@@ -14,6 +14,9 @@ type RouteKey struct {
 type NetworkRoute struct {
 	Path []*NetworkNode
 
+	// Network statistics
+
+	// how many are refrencing it
 	RefCount int
 }
 
