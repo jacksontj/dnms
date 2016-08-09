@@ -19,12 +19,14 @@ func main() {
 
 	flag.Parse()
 
+	// Start the mapper (at this point no peers-- so it will do nothing)
 	m := mapper.NewMapper()
 	m.Start()
 
 	// #TODO: load from a config file
 	cfg := memberlist.DefaultLANConfig()
 
+	// Wire up the delegate-- he'll handle pings and node up/down events
 	delegate := NewDNMSDelegate(m)
 	cfg.Delegate = delegate
 	cfg.Events = delegate
@@ -32,19 +34,20 @@ func main() {
 	// TODO: load from config
 	cfg.BindPort = 33434
 	cfg.AdvertisePort = 33434
-
 	if *advertiseStr != "" {
 		cfg.AdvertiseAddr = *advertiseStr
 		logrus.Infof("addr: %v", *advertiseStr)
 	}
 
+	// Create the memberlist with the config we just made
 	mlist, err := memberlist.Create(cfg)
 	delegate.Mlist = mlist
-
 	if err != nil {
 		logrus.Fatalf("Unable to create memberlist: %v", err)
 	}
 
+	// TODO: background thing to join if we end up alone?
+	// Join if we can
 	mlist.Join([]string{*peerStr})
 
 	// start the pinger
@@ -68,9 +71,9 @@ func main() {
 			w.Write(ret)
 		}
 	})
-
 	go http.ListenAndServe(":12345", nil)
 
+	// print state of the world for ease of debugging
 	for {
 		time.Sleep(time.Second)
 		logrus.Infof("peers=%d nodes=%d links=%d routes=%d",
