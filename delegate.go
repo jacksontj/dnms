@@ -10,12 +10,12 @@ import (
 
 type DNMSDelegate struct {
 	Graph    *graph.NetworkGraph
-	RouteMap *RouteMap
+	RouteMap *graph.RouteMap
 
 	Mlist *memberlist.Memberlist
 }
 
-func NewDNMSDelegate(g *graph.NetworkGraph, r *RouteMap) *DNMSDelegate {
+func NewDNMSDelegate(g *graph.NetworkGraph, r *graph.RouteMap) *DNMSDelegate {
 	return &DNMSDelegate{
 		Graph:    g,
 		RouteMap: r,

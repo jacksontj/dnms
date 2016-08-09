@@ -16,7 +16,7 @@ import (
 )
 
 // This goroutine is responsible for mapping app peers on the network
-func mapper(routeMap *RouteMap, g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
+func mapper(routeMap *graph.RouteMap, g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
 	srcPortStart := 33435
 	srcPortEnd := 33500
 
@@ -75,7 +75,7 @@ func mapper(routeMap *RouteMap, g *graph.NetworkGraph, mlist *memberlist.Memberl
 	}
 }
 
-func pinger(routeMap *RouteMap, mlist *memberlist.Memberlist) {
+func pinger(routeMap *graph.RouteMap, mlist *memberlist.Memberlist) {
 	for {
 		time.Sleep(time.Second)
 		nodes := mlist.Members()
@@ -182,7 +182,7 @@ func main() {
 	flag.Parse()
 
 	g := graph.Create()
-	routeMap := NewRouteMap()
+	routeMap := graph.NewRouteMap()
 
 	// #TODO: load from a config file
 	cfg := memberlist.DefaultLANConfig()
