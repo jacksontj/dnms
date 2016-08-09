@@ -132,12 +132,15 @@ func pinger(routeMap *RouteMap, mlist *memberlist.Memberlist) {
 
 				// TODO: get a response from the ping
 				retBuf := make([]byte, 2048)
-				readRet, err := conn.Read(retBuf)
-				if err == nil {
-					logrus.Infof("AckMsg %s", string(retBuf[0:readRet]))
-				} else {
-					logrus.Errorf("Some error %v %v\n", err, readRet)
-				}
+				conn.Read(retBuf)
+				//readRet, err := conn.Read(retBuf)
+				/*
+					if err == nil {
+						logrus.Infof("AckMsg %s", string(retBuf[0:readRet]))
+					} else {
+						logrus.Errorf("Some error %v %v\n", err, readRet)
+					}
+				*/
 				conn.Close()
 				time.Sleep(time.Second)
 			}
