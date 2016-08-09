@@ -1,16 +1,17 @@
-package graph
+package mapper
 
 // Map for port + node -> route
 import (
 	"strconv"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/jacksontj/dnms/graph"
 )
 
 // TODO: do our own route refcounting (up and down)
 type RouteMap struct {
 	// "srcPort:nodename" -> route
-	NodeRouteMap map[string]*NetworkRoute
+	NodeRouteMap map[string]*graph.NetworkRoute
 
 	// nodename -> NodeRouteMap-Key
 	nodeKeyMap map[string]map[string]interface{}
@@ -18,12 +19,12 @@ type RouteMap struct {
 
 func NewRouteMap() *RouteMap {
 	return &RouteMap{
-		NodeRouteMap: make(map[string]*NetworkRoute),
+		NodeRouteMap: make(map[string]*graph.NetworkRoute),
 		nodeKeyMap:   make(map[string]map[string]interface{}),
 	}
 }
 
-func (r *RouteMap) GetRoute(key string) *NetworkRoute {
+func (r *RouteMap) GetRoute(key string) *graph.NetworkRoute {
 	route, _ := r.NodeRouteMap[key]
 	return route
 }
@@ -37,24 +38,25 @@ func (r *RouteMap) FindRoute(path []string) (string, bool) {
 	return "", false
 }
 
-// TODO: make this spawn the goroutine instead of the caller?
 func (r *RouteMap) IterRoutes(name string, keysChan chan string) {
-	usedRoutes := make(map[*NetworkRoute]interface{})
+	go func() {
+		usedRoutes := make(map[*graph.NetworkRoute]interface{})
 
-	nodeMap, ok := r.nodeKeyMap[name]
-	// If there is something, iterate over them and stick the key down the channel
-	if ok {
-		for key := range nodeMap {
-			route, _ := r.NodeRouteMap[key]
-			if _, ok := usedRoutes[route]; !ok {
-				keysChan <- key
-				usedRoutes[route] = struct{}{}
+		nodeMap, ok := r.nodeKeyMap[name]
+		// If there is something, iterate over them and stick the key down the channel
+		if ok {
+			for key := range nodeMap {
+				route, _ := r.NodeRouteMap[key]
+				if _, ok := usedRoutes[route]; !ok {
+					keysChan <- key
+					usedRoutes[route] = struct{}{}
+				}
+
 			}
-
 		}
-	}
 
-	close(keysChan)
+		close(keysChan)
+	}()
 }
 
 func (r *RouteMap) AddNodeKey(name, key string) {
@@ -76,7 +78,7 @@ func (r *RouteMap) RemoveNodeKey(name, key string) {
 	delete(nMap, key)
 }
 
-func (r *RouteMap) GetRouteOption(srcPort int, dst string) *NetworkRoute {
+func (r *RouteMap) GetRouteOption(srcPort int, dst string) *graph.NetworkRoute {
 	key := strconv.Itoa(srcPort) + ":" + dst
 
 	route, _ := r.NodeRouteMap[key]
@@ -84,7 +86,7 @@ func (r *RouteMap) GetRouteOption(srcPort int, dst string) *NetworkRoute {
 }
 
 //
-func (r *RouteMap) UpdateRouteOption(srcPort int, dst string, newRoute *NetworkRoute) {
+func (r *RouteMap) UpdateRouteOption(srcPort int, dst string, newRoute *graph.NetworkRoute) {
 	key := strconv.Itoa(srcPort) + ":" + dst
 
 	route, ok := r.NodeRouteMap[key]
@@ -99,13 +101,13 @@ func (r *RouteMap) UpdateRouteOption(srcPort int, dst string, newRoute *NetworkR
 
 // TODO: do our own route refcounting
 // Remove all route options associated with dst
-func (r *RouteMap) RemoveDst(dst string) []*NetworkRoute {
+func (r *RouteMap) RemoveDst(dst string) []*graph.NetworkRoute {
 	nodeKeys, ok := r.nodeKeyMap[dst]
 	if !ok {
 		logrus.Warningf("Removing route options for a dst that isn't in the map: %s", dst)
 		return nil
 	}
-	ret := make([]*NetworkRoute, 0, len(nodeKeys))
+	ret := make([]*graph.NetworkRoute, 0, len(nodeKeys))
 	for key := range nodeKeys {
 		v, _ := r.NodeRouteMap[key]
 		ret = append(ret, v)

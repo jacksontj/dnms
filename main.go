@@ -3,175 +3,13 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"net"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/jacksontj/dnms/graph"
-	"github.com/jacksontj/dnms/traceroute"
+	"github.com/jacksontj/dnms/mapper"
 	"github.com/jacksontj/memberlist"
 )
-
-// This goroutine is responsible for mapping app peers on the network
-func mapper(routeMap *graph.RouteMap, g *graph.NetworkGraph, mlist *memberlist.Memberlist) {
-	srcPortStart := 33435
-	srcPortEnd := 33500
-
-	for {
-		nodes := mlist.Members()
-
-		for _, node := range nodes {
-			// if this is ourselves, skip!
-			if node == mlist.LocalNode() {
-				continue
-			}
-
-			// Otherwise, lets do some stuff
-			logrus.Infof("get routes to peer: %v %v", node.Addr, node)
-
-			for srcPort := srcPortStart; srcPort < srcPortEnd; srcPort++ {
-
-				options := traceroute.TracerouteOptions{}
-				options.SetSrcPort(srcPort)        // TODO: config
-				options.SetDstPort(int(node.Port)) // TODO: config
-
-				ret, err := traceroute.Traceroute(
-					node.Addr.String(), // TODO: take the IP direct
-					&options,
-				)
-				if err != nil {
-					logrus.Infof("Traceroute err: %v", err)
-					continue
-				}
-
-				logrus.Infof("Traceroute %d -> %s: complete", srcPort, node.Addr.String())
-
-				path := make([]string, 0, len(ret.Hops))
-
-				for _, hop := range ret.Hops {
-					path = append(path, hop.AddressString())
-				}
-
-				currRoute := routeMap.GetRouteOption(srcPort, node.Addr.String())
-
-				// If we don't have a current route, or the paths differ-- lets update
-				if currRoute == nil || !currRoute.SamePath(path) {
-					// Add new one
-					routeMap.UpdateRouteOption(srcPort, node.Addr.String(), g.IncrRoute(path))
-
-					// Remove old one if it exists
-					if currRoute != nil {
-						g.DecrRoute(currRoute.Hops())
-					}
-				}
-
-				// TODO configurable rate
-				time.Sleep(time.Second * 5)
-			}
-		}
-	}
-}
-
-func pinger(routeMap *graph.RouteMap, mlist *memberlist.Memberlist) {
-	for {
-		time.Sleep(time.Second)
-		nodes := mlist.Members()
-
-		for _, node := range nodes {
-			// if this is ourselves, skip!
-			if node == mlist.LocalNode() {
-				continue
-			}
-			c := make(chan string)
-			go routeMap.IterRoutes(node.Addr.String(), c)
-			for routeKey := range c {
-				route := routeMap.GetRoute(routeKey)
-				// TODO: better
-				if route == nil {
-					continue
-				}
-				routeKeyParts := strings.SplitN(routeKey, ":", 2)
-				srcPort, _ := strconv.Atoi(routeKeyParts[0])
-				logrus.Infof("Ping srcPort=%d dst=%s", srcPort, routeKeyParts[1])
-
-				p := ping{
-					SrcName:    mlist.LocalNode().Addr.String(),
-					SrcPort:    srcPort,
-					DstName:    node.Addr.String(),
-					DstPort:    int(node.Port),
-					Path:       route.Hops(),
-					PingTimeNS: time.Now().UnixNano(),
-				}
-				// TODO: major cleanup to encapsulate all this message sending
-				// Encode as a user message
-				encodedBuf, err := encode(pingMsg, p)
-				if err != nil {
-					logrus.Infof("Unable to encode pingMsg: %v", err)
-					continue
-				}
-				msg := encodedBuf.Bytes()
-				buf := make([]byte, 1, len(msg)+1)
-				buf[0] = byte(8) // TODO: add sendFrom API to memberlist
-				buf = append(buf, msg...)
-
-				LocalAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:"+routeKeyParts[0])
-				if err != nil {
-					logrus.Errorf("unable to resolve source addr %v", err)
-				}
-				RemoteEP := net.UDPAddr{IP: node.Addr, Port: int(node.Port)}
-				conn, err := net.DialUDP("udp", LocalAddr, &RemoteEP)
-				if err != nil {
-					// handle error
-					logrus.Errorf("unable to connect to peer: %v", err)
-					continue
-				}
-				// TODO: configurable time
-				conn.SetDeadline(time.Now().Add(time.Second))
-
-				// TODO: figure out how to get the message back...
-				// seems that I might have to add some methods to get at `WriteToUDP`
-				// in memberlist
-				conn.Write(buf)
-
-				// TODO: get a response from the ping
-				retBuf := make([]byte, 2048)
-				readRet, err := conn.Read(retBuf)
-				// if there was a response
-				if readRet > 0 {
-					// Note: throwing away the first byte-- as its the memberlist header
-					msgType := messageType(retBuf[1])
-					retBuf = retBuf[2:]
-
-					switch msgType {
-
-					case ackMsg:
-						a := ack{}
-						err := decode(retBuf, &a)
-						if err != nil {
-							logrus.Warning("Unable to decode message: %v", err)
-							continue
-						} else {
-							//logrus.Infof("took %v ns): %v", time.Now().UnixNano()-a.PingTimeNS, a)
-							// TODO: use the ACK for something
-						}
-
-					default:
-						logrus.Infof("Got unknown response type from ack: %v", msgType)
-					}
-				} else {
-					// TODO: use the absense of ACK for something
-					logrus.Infof("ACK timeout")
-				}
-				conn.Close()
-				time.Sleep(time.Second)
-			}
-		}
-	}
-
-}
 
 func main() {
 	// Some CLI args for better testing
@@ -181,13 +19,15 @@ func main() {
 
 	flag.Parse()
 
-	g := graph.Create()
-	routeMap := graph.NewRouteMap()
+	m := mapper.NewMapper()
+	m.Start()
+
+	routeMap := mapper.NewRouteMap()
 
 	// #TODO: load from a config file
 	cfg := memberlist.DefaultLANConfig()
 
-	delegate := NewDNMSDelegate(g, routeMap)
+	delegate := NewDNMSDelegate(m)
 	cfg.Delegate = delegate
 	cfg.Events = delegate
 
@@ -209,8 +49,15 @@ func main() {
 
 	mlist.Join([]string{*peerStr})
 
-	go mapper(routeMap, g, mlist)
-	go pinger(routeMap, mlist)
+	// start the pinger
+	p := Pinger{
+		M: m,
+		Self: mapper.Peer{
+			Name: mlist.LocalNode().Addr.String(),
+			Port: int(mlist.LocalNode().Port),
+		},
+	}
+	p.Start()
 
 	// TODO: API endpoint
 	// Create helpful HTTP endpoint for debugging
@@ -230,9 +77,9 @@ func main() {
 		time.Sleep(time.Second)
 		logrus.Infof("peers=%d nodes=%d links=%d routes=%d",
 			mlist.NumMembers()-1,
-			g.GetNodeCount(),
-			g.GetLinkCount(),
-			g.GetRouteCount(),
+			m.Graph.GetNodeCount(),
+			m.Graph.GetLinkCount(),
+			m.Graph.GetRouteCount(),
 		)
 	}
 

@@ -4,21 +4,19 @@ import (
 	"net"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/jacksontj/dnms/graph"
+	"github.com/jacksontj/dnms/mapper"
 	"github.com/jacksontj/memberlist"
 )
 
 type DNMSDelegate struct {
-	Graph    *graph.NetworkGraph
-	RouteMap *graph.RouteMap
+	Mapper *mapper.Mapper
 
 	Mlist *memberlist.Memberlist
 }
 
-func NewDNMSDelegate(g *graph.NetworkGraph, r *graph.RouteMap) *DNMSDelegate {
+func NewDNMSDelegate(m *mapper.Mapper) *DNMSDelegate {
 	return &DNMSDelegate{
-		Graph:    g,
-		RouteMap: r,
+		Mapper: m,
 	}
 }
 
@@ -109,16 +107,27 @@ func (d *DNMSDelegate) MergeRemoteState(buf []byte, join bool) {
 // NotifyJoin is invoked when a node is detected to have joined.
 // The Node argument must not be modified.
 func (d *DNMSDelegate) NotifyJoin(n *memberlist.Node) {
+	// Workaround startup chicken and egg problem
+	if d.Mlist == nil {
+		return
+	}
 	logrus.Infof("Node joined %s", n.Addr.String())
+	// TOOD: check it isn't us? shouldn't be as that should be covered by our
+	// workaround up top
+	d.Mapper.AddPeer(mapper.Peer{
+		Name: n.Addr.String(),
+		Port: int(n.Port),
+	})
 }
 
 // NotifyLeave is invoked when a node is detected to have left.
 // The Node argument must not be modified.
 func (d *DNMSDelegate) NotifyLeave(n *memberlist.Node) {
 	logrus.Infof("Node left %s", n.Addr.String())
-	for _, route := range d.RouteMap.RemoveDst(n.Addr.String()) {
-		d.Graph.DecrRoute(route.Hops())
-	}
+	d.Mapper.RemovePeer(mapper.Peer{
+		Name: n.Addr.String(),
+		Port: int(n.Port),
+	})
 }
 
 // NotifyUpdate is invoked when a node is detected to have
