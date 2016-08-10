@@ -25,7 +25,7 @@ func (h *HTTPApi) Start() {
 	http.HandleFunc("/v1/routemap", h.showRouteMap)
 
 	// event endpoint
-	http.HandleFunc("/v1/events", h.eventStream)
+	http.HandleFunc("/v1/events/graph", h.eventStreamGraph)
 
 	go http.ListenAndServe(":12345", nil)
 }
@@ -91,8 +91,8 @@ func (h *HTTPApi) showRouteMap(w http.ResponseWriter, r *http.Request) {
 // TODO: start with a dump of everything-- then all updates since then (to avoid races)
 // TODO: implement stream of events (removal/addition of graph elements, state changes,
 // routemap changes, etc.)
-func (h *HTTPApi) eventStream(w http.ResponseWriter, r *http.Request) {
-
+func (h *HTTPApi) eventStreamGraph(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("TODO"))
 }
 
 func httpAPI(m *mapper.Mapper) {
