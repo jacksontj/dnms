@@ -51,7 +51,7 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		}
 		routeKeyParts := strings.SplitN(routeKey, ":", 2)
 		srcPort, _ := strconv.Atoi(routeKeyParts[0])
-		logrus.Infof("Ping srcPort=%d dst=%s", srcPort, routeKeyParts[1])
+		logrus.Debugf("Ping srcPort=%d dst=%s", srcPort, routeKeyParts[1])
 
 		p := ping{
 			SrcName:    p.Self.Name,
