@@ -13,12 +13,12 @@ import (
 // TODO: maintain some maps for easier lookup
 type NetworkGraph struct {
 	// nodeName -> Node
-	NodesMap map[string]*NetworkNode
+	NodesMap map[string]*NetworkNode `json:"nodes"`
 
 	// nodeName,nodeName -> NetworkLink
-	LinksMap map[string]*NetworkLink
+	LinksMap map[string]*NetworkLink `json:"edges"`
 
-	RoutesMap map[string]*NetworkRoute
+	RoutesMap map[string]*NetworkRoute `json:"routes"`
 }
 
 func Create() *NetworkGraph {
