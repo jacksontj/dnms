@@ -15,8 +15,6 @@ if __name__ == '__main__':
         'nodes': {},
     }
 
-    nodes = {}
-
     for routeKey, routeMap in requests.get(sys.argv[1]).json().iteritems():
         for i, node in enumerate(routeMap['Path']):
             g.add_node(node['Name'])
@@ -26,11 +24,16 @@ if __name__ == '__main__':
                 labels['edges'][(routeMap['Path'][i-1]['Name'], routeMap['Path'][i]['Name'])] = (routeMap['Path'][i-1]['Name'], routeMap['Path'][i]['Name'])
 
 
-    nx.draw_networkx(g, with_labels=True)
-
-    # add labels
-    #nx.draw_networkx_labels(g, pos, labels['nodes'])
-    #nx.draw_networkx_edge_labels(g, pos, labels['edges'])
+    pos = nx.drawing.spring_layout(
+        g,
+        scale=10.0,
+    )
+    nx.draw_networkx(
+        g,
+        pos=pos,
+        with_labels=True,
+        font_size=8,
+    )
 
     # write out the graph
     plt.savefig(
