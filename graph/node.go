@@ -12,10 +12,10 @@ import (
 // node on either side? so something like A -> * -> * -> B would become A*_B (for the second *)
 // TODO: maintain pointers to NetworkLink for traversal
 type NetworkNode struct {
-	Name string
+	Name string `json:"name"`
 
 	// asynchronously loaded
-	DNSNames []string
+	DNSNames []string `json:"dns_names"`
 
 	refCount int
 }

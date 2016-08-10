@@ -207,13 +207,13 @@
 
         // load nodes
         $.map(data.nodes, function(val, key) {
-            graph.addNode(val.Name);
+            graph.addNode(val.name);
         });
 
         // load edges
         $.map(data.edges, function(val, key) {
             // TODO: weights
-            graph.addLink(val.Src.Name, val.Dst.Name, '20');
+            graph.addLink(val.src.name, val.dst.name, '20');
         });
 
         keepNodesOnTop();

@@ -20,10 +20,10 @@ type RoutePingResponse struct {
 // world before we are useful
 // TODO: stats about route health
 type NetworkRoute struct {
-	Path []*NetworkNode
+	Path []*NetworkNode `json:"path"`
 
 	// Network statistics
-	State      graphState // TODO: better handle in the serialization
+	State graphState `json:"state"` // TODO: better handle in the serialization
 	// TODO: race condition around this-- either lock it up, or goroutine it
 	metricRing *ring.Ring
 
@@ -134,7 +134,7 @@ func (r *NetworkRoute) MarshalJSON() ([]byte, error) {
 	type Alias NetworkRoute
 	return json.Marshal(&struct {
 		//MetricPoints []RoutePingResponse
-		Metrics map[string]interface{}
+		Metrics map[string]interface{} `json:"metrics"`
 		*Alias
 	}{
 		//MetricPoints: metricPoints,
