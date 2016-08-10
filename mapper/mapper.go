@@ -138,7 +138,8 @@ func (m *Mapper) mapPeer(p *Peer) {
 		// If we don't have a current route, or the paths differ-- lets update
 		if currRoute == nil || !currRoute.SamePath(path) {
 			// Add new one
-			m.RouteMap.UpdateRouteOption(srcPort, p.Name, m.Graph.IncrRoute(path))
+			newRoute, _ := m.Graph.IncrRoute(path)
+			m.RouteMap.UpdateRouteOption(srcPort, p.Name, newRoute)
 
 			// Remove old one if it exists
 			if currRoute != nil {

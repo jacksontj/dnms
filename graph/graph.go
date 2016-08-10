@@ -29,7 +29,7 @@ func Create() *NetworkGraph {
 	}
 }
 
-func (g *NetworkGraph) IncrNode(name string) *NetworkNode {
+func (g *NetworkGraph) IncrNode(name string) (*NetworkNode, bool) {
 	n, ok := g.NodesMap[name]
 	// if this one doesn't exist, lets add it
 	if !ok {
@@ -37,7 +37,7 @@ func (g *NetworkGraph) IncrNode(name string) *NetworkNode {
 		g.NodesMap[name] = n
 	}
 	n.refCount++
-	return n
+	return n, !ok
 }
 
 func (g *NetworkGraph) GetNode(name string) *NetworkNode {
@@ -49,32 +49,36 @@ func (g *NetworkGraph) GetNodeCount() int {
 	return len(g.NodesMap)
 }
 
-func (g *NetworkGraph) DecrNode(name string) {
+func (g *NetworkGraph) DecrNode(name string) bool {
 	n, ok := g.NodesMap[name]
 
 	if !ok {
 		logrus.Warningf("Attempted to remove node with ip %v which wasn't in the graph", name)
-		return
+		return false
 	}
 
 	n.refCount--
 	if n.refCount == 0 {
 		delete(g.NodesMap, name)
+		return true
 	}
+	return false
 }
 
-func (g *NetworkGraph) IncrLink(src, dst string) *NetworkLink {
+func (g *NetworkGraph) IncrLink(src, dst string) (*NetworkLink, bool) {
 	key := src + "," + dst
 	l, ok := g.LinksMap[key]
 	if !ok {
+		srcNode, _ := g.IncrNode(src)
+		dstNode, _ := g.IncrNode(dst)
 		l = &NetworkLink{
-			Src: g.IncrNode(src),
-			Dst: g.IncrNode(dst),
+			Src: srcNode,
+			Dst: dstNode,
 		}
 		g.LinksMap[key] = l
 	}
 	l.refCount++
-	return l
+	return l, !ok
 }
 
 func (g *NetworkGraph) GetLink(src, dst string) *NetworkLink {
@@ -87,12 +91,12 @@ func (g *NetworkGraph) GetLinkCount() int {
 	return len(g.LinksMap)
 }
 
-func (g *NetworkGraph) DecrLink(src, dst string) {
+func (g *NetworkGraph) DecrLink(src, dst string) bool {
 	key := src + "," + dst
 	l, ok := g.LinksMap[key]
 	if !ok {
 		logrus.Warningf("Attempted to remove link %v which wasn't in the graph", key)
-		return
+		return false
 	}
 	// decrement ourselves
 	l.refCount--
@@ -101,7 +105,9 @@ func (g *NetworkGraph) DecrLink(src, dst string) {
 		g.DecrNode(src)
 		g.DecrNode(dst)
 		delete(g.LinksMap, key)
+		return true
 	}
+	return false
 }
 
 func (g *NetworkGraph) pathKey(hops []string) string {
@@ -112,7 +118,7 @@ func (g *NetworkGraph) pathKey(hops []string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
+func (g *NetworkGraph) IncrRoute(hops []string) (*NetworkRoute, bool) {
 	key := g.pathKey(hops)
 
 	// check if we have a route for this already
@@ -122,7 +128,8 @@ func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
 		logrus.Infof("New Route: key=%s %v", key, hops)
 		path := make([]*NetworkNode, 0, len(hops))
 		for i, hop := range hops {
-			path = append(path, g.IncrNode(hop))
+			hopNode, _ := g.IncrNode(hop)
+			path = append(path, hopNode)
 			// If there was something prior-- lets add the link as well
 			if i-1 >= 0 {
 				g.IncrLink(hops[i-1], hop)
@@ -139,7 +146,7 @@ func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
 	// increment route's refcount
 	route.refCount++
 
-	return route
+	return route, !ok
 }
 
 func (g *NetworkGraph) GetRoute(hops []string) *NetworkRoute {
@@ -151,12 +158,12 @@ func (g *NetworkGraph) GetRouteCount() int {
 	return len(g.RoutesMap)
 }
 
-func (g *NetworkGraph) DecrRoute(hops []string) {
+func (g *NetworkGraph) DecrRoute(hops []string) bool {
 	key := g.pathKey(hops)
 	r, ok := g.RoutesMap[key]
 	if !ok {
 		logrus.Warningf("Attempted to remove route %v which wasn't in the graph", key)
-		return
+		return false
 	}
 
 	r.refCount--
@@ -170,5 +177,7 @@ func (g *NetworkGraph) DecrRoute(hops []string) {
 		}
 
 		delete(g.RoutesMap, key)
+		return true
 	}
+	return false
 }
