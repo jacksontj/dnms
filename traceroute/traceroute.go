@@ -1,3 +1,4 @@
+// TODO: support ipv6
 // Package traceroute provides functions for executing a tracroute to a remote
 // host.
 package traceroute
@@ -50,7 +51,6 @@ func destAddr(dest string) (destAddr [4]byte, err error) {
 type TracerouteHop struct {
 	Success     bool
 	Address     [4]byte
-	Host        string
 	N           int
 	ElapsedTime time.Duration
 	TTL         int
@@ -58,14 +58,6 @@ type TracerouteHop struct {
 
 func (hop *TracerouteHop) AddressString() string {
 	return fmt.Sprintf("%v.%v.%v.%v", hop.Address[0], hop.Address[1], hop.Address[2], hop.Address[3])
-}
-
-func (hop *TracerouteHop) HostOrAddressString() string {
-	hostOrAddr := hop.AddressString()
-	if hop.Host != "" {
-		hostOrAddr = hop.Host
-	}
-	return hostOrAddr
 }
 
 // TracerouteResult type
@@ -158,13 +150,6 @@ func Traceroute(dest string, options *TracerouteOptions, c ...chan TracerouteHop
 				N:           n,
 				ElapsedTime: elapsed,
 				TTL:         ttl,
-			}
-
-			// TODO: this reverse lookup appears to have some standard timeout that is relatively
-			// high. Consider switching to something where there is greater control.
-			currHost, err := net.LookupAddr(hop.AddressString())
-			if err == nil {
-				hop.Host = currHost[0]
 			}
 
 			notify(hop, c)

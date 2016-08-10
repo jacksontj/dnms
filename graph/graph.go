@@ -34,9 +34,7 @@ func (g *NetworkGraph) IncrNode(name string) *NetworkNode {
 	n, ok := g.NodesMap[name]
 	// if this one doesn't exist, lets add it
 	if !ok {
-		n = &NetworkNode{
-			Name: name,
-		}
+		n = NewNetworkNode(name)
 		g.NodesMap[name] = n
 	}
 	n.refCount++
