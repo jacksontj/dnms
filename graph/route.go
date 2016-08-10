@@ -24,6 +24,7 @@ type NetworkRoute struct {
 
 	// Network statistics
 	State      graphState // TODO: better handle in the serialization
+	// TODO: race condition around this-- either lock it up, or goroutine it
 	metricRing *ring.Ring
 
 	// how many are refrencing it
