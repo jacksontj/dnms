@@ -134,7 +134,7 @@ func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
 		route = &NetworkRoute{
 			Path:       path,
 			State:      Up,
-			MetricRing: ring.New(10), // TODO: config
+			metricRing: ring.New(10), // TODO: config
 		}
 		g.RoutesMap[key] = route
 	}

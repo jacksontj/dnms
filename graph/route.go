@@ -24,18 +24,18 @@ type NetworkRoute struct {
 
 	// Network statistics
 	State      graphState // TODO: better handle in the serialization
-	MetricRing *ring.Ring
+	metricRing *ring.Ring
 
 	// how many are refrencing it
 	refCount int
 }
 
 func (r *NetworkRoute) HandleACK(pass bool, latency int64) {
-	r.MetricRing.Value = RoutePingResponse{
+	r.metricRing.Value = RoutePingResponse{
 		Pass:    pass,
 		Latency: latency,
 	}
-	r.MetricRing = r.MetricRing.Next()
+	r.metricRing = r.metricRing.Next()
 
 	// TODO: change to percentage thresholds
 	// update state
@@ -99,9 +99,9 @@ func (r *NetworkRoute) MarshalJSON() ([]byte, error) {
 	// Convert MetricRing to a list of points
 	fail := 0
 	// TODO: re-add raw points
-	metricPoints := make([]RoutePingResponse, 0, r.MetricRing.Len())
-	latencies := make([]float64, 0, r.MetricRing.Len())
-	r.MetricRing.Do(func(x interface{}) {
+	metricPoints := make([]RoutePingResponse, 0, r.metricRing.Len())
+	latencies := make([]float64, 0, r.metricRing.Len())
+	r.metricRing.Do(func(x interface{}) {
 		if x != nil {
 			point := x.(RoutePingResponse)
 			metricPoints = append(metricPoints, point)
