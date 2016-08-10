@@ -18,6 +18,8 @@ type Peer struct {
 // Responsible for maintaining a `NetworkGraph` by mapping the network at
 // a configured interval
 type Mapper struct {
+	// TODO: locking around this. Right now if a peer drops off while a mapping task
+	// is completing the route ends up in here even though the peer is gone
 	peerMap map[string]*Peer
 
 	// graph of the network
