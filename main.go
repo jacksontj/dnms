@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"net/http"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -60,18 +58,10 @@ func main() {
 	}
 	p.Start()
 
-	// TODO: API endpoint
-	// Create helpful HTTP endpoint for debugging
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		ret, err := json.Marshal(m.RouteMap.NodeRouteMap)
-		if err != nil {
-			logrus.Errorf("Unable to marshal graph: %v", err)
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write(ret)
-		}
-	})
-	go http.ListenAndServe(":12345", nil)
+	// TODO pass additional config
+	// Start HTTP API
+	api := HTTPApi{m}
+	api.Start()
 
 	// print state of the world for ease of debugging
 	for {

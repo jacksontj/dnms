@@ -15,9 +15,8 @@ type NetworkGraph struct {
 	// nodeName -> Node
 	NodesMap map[string]*NetworkNode
 
-	// TODO: change linkKey to string
 	// nodeName,nodeName -> NetworkLink
-	LinksMap map[NetworkLinkKey]*NetworkLink
+	LinksMap map[string]*NetworkLink
 
 	RoutesMap map[string]*NetworkRoute
 }
@@ -25,7 +24,7 @@ type NetworkGraph struct {
 func Create() *NetworkGraph {
 	return &NetworkGraph{
 		NodesMap:  make(map[string]*NetworkNode),
-		LinksMap:  make(map[NetworkLinkKey]*NetworkLink),
+		LinksMap:  make(map[string]*NetworkLink),
 		RoutesMap: make(map[string]*NetworkRoute),
 	}
 }
@@ -65,7 +64,7 @@ func (g *NetworkGraph) DecrNode(name string) {
 }
 
 func (g *NetworkGraph) IncrLink(src, dst string) *NetworkLink {
-	key := NetworkLinkKey{src, dst}
+	key := src + "," + dst
 	l, ok := g.LinksMap[key]
 	if !ok {
 		l = &NetworkLink{
@@ -79,7 +78,7 @@ func (g *NetworkGraph) IncrLink(src, dst string) *NetworkLink {
 }
 
 func (g *NetworkGraph) GetLink(src, dst string) *NetworkLink {
-	key := NetworkLinkKey{src, dst}
+	key := src + "," + dst
 	l, _ := g.LinksMap[key]
 	return l
 }
@@ -89,7 +88,7 @@ func (g *NetworkGraph) GetLinkCount() int {
 }
 
 func (g *NetworkGraph) DecrLink(src, dst string) {
-	key := NetworkLinkKey{src, dst}
+	key := src + "," + dst
 	l, ok := g.LinksMap[key]
 	if !ok {
 		logrus.Warningf("Attempted to remove link %v which wasn't in the graph", key)

@@ -22,4 +22,8 @@ General TODO:
             -- current nodes
             -- current edges
         -- some "graph" metrics (connectivity, etc.)
-    - REST API endpoint
+    - REST API event stream
+
+Metrics to figure out:
+    - how many times a route flops over to a new one (route changes)
+    - average routes per peer?
