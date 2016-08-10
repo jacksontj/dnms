@@ -2,6 +2,7 @@
 package graph
 
 import (
+	"container/ring"
 	"crypto/md5"
 	"encoding/hex"
 	"io"
@@ -131,7 +132,9 @@ func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
 			}
 		}
 		route = &NetworkRoute{
-			Path: path,
+			Path:       path,
+			State:      Up,
+			MetricRing: ring.New(10), // TODO: config
 		}
 		g.RoutesMap[key] = route
 	}

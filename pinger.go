@@ -98,6 +98,10 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		// TODO: get a response from the ping
 		retBuf := make([]byte, 2048)
 		readRet, err := conn.Read(retBuf)
+
+		// Whether we got an ACK
+		passed := false
+
 		// if there was a response
 		if readRet > 0 {
 			// Note: throwing away the first byte-- as its the memberlist header
@@ -113,17 +117,14 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 					logrus.Warning("Unable to decode message: %v", err)
 					continue
 				} else {
-					//logrus.Infof("took %v ns): %v", time.Now().UnixNano()-a.PingTimeNS, a)
-					// TODO: use the ACK for something
+					passed = true
 				}
 
 			default:
 				logrus.Infof("Got unknown response type from ack: %v", msgType)
 			}
-		} else {
-			// TODO: use the absense of ACK for something
-			logrus.Infof("ACK timeout")
 		}
+		route.HandleACK(passed, time.Now().UnixNano()-p.PingTimeNS)
 		conn.Close()
 		time.Sleep(time.Second)
 	}

@@ -1,8 +1,16 @@
 package graph
 
-type RouteKey struct {
-	Src string
-	Dst string
+import (
+	"container/ring"
+	"encoding/json"
+
+	"github.com/montanaflynn/stats"
+)
+
+// TODO: measure jitter (diff between 2 packet sends)
+type RoutePingResponse struct {
+	Pass    bool  // Did it ack?
+	Latency int64 // Latency (if it ackd)
 }
 
 // TODO: RoundTripRoute? Right now the Route is a single direction since we only
@@ -15,9 +23,38 @@ type NetworkRoute struct {
 	Path []*NetworkNode
 
 	// Network statistics
+	State      graphState // TODO: better handle in the serialization
+	MetricRing *ring.Ring
 
 	// how many are refrencing it
 	RefCount int
+}
+
+func (r *NetworkRoute) HandleACK(pass bool, latency int64) {
+	r.MetricRing.Value = RoutePingResponse{
+		Pass:    pass,
+		Latency: latency,
+	}
+	r.MetricRing = r.MetricRing.Next()
+
+	// TODO: change to percentage thresholds
+	// update state
+	if pass == true { // Going up
+		switch r.State {
+		case Suspect:
+			r.State = Up
+		case Down:
+			r.State = Suspect
+		}
+	} else { // going down
+		switch r.State {
+		case Up:
+			r.State = Suspect
+		case Suspect:
+			r.State = Down
+		}
+	}
+
 }
 
 func (r *NetworkRoute) SamePath(path []string) bool {
@@ -55,4 +92,48 @@ func (r *NetworkRoute) Hops() []string {
 		hops = append(hops, node.Name)
 	}
 	return hops
+}
+
+// Fancy marshal method
+func (r *NetworkRoute) MarshalJSON() ([]byte, error) {
+	// Convert MetricRing to a list of points
+	fail := 0
+	// TODO: re-add raw points
+	metricPoints := make([]RoutePingResponse, 0, r.MetricRing.Len())
+	latencies := make([]float64, 0, r.MetricRing.Len())
+	r.MetricRing.Do(func(x interface{}) {
+		if x != nil {
+			point := x.(RoutePingResponse)
+			metricPoints = append(metricPoints, point)
+			latencies = append(latencies, float64(point.Latency))
+			if !point.Pass {
+				fail++
+			}
+		}
+	})
+
+	// Do all metrics calculations here
+	metrics := make(map[string]interface{})
+	metrics["numPoints"] = len(metricPoints)
+	if len(metricPoints) > 0 {
+		metrics["lossRate"] = float64(fail) / float64(len(metricPoints))
+	} else {
+		metrics["lossRate"] = float64(0)
+	}
+	if dev, err := stats.StandardDeviation(latencies); err == nil {
+		metrics["standardDeviation"] = dev
+	}
+
+	type Alias NetworkRoute
+	return json.Marshal(&struct {
+		RCount int
+		//MetricPoints []RoutePingResponse
+		Metrics map[string]interface{}
+		*Alias
+	}{
+		RCount: r.RefCount,
+		//MetricPoints: metricPoints,
+		Metrics: metrics,
+		Alias:   (*Alias)(r),
+	})
 }
