@@ -124,7 +124,7 @@ func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
 		for i, hop := range hops {
 			path = append(path, g.IncrNode(hop))
 			// If there was something prior-- lets add the link as well
-			if i-1 > 0 {
+			if i-1 >= 0 {
 				g.IncrLink(hops[i-1], hop)
 			}
 		}

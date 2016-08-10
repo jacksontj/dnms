@@ -30,13 +30,19 @@ func (h *HTTPApi) Start() {
 	go http.ListenAndServe(":12345", nil)
 }
 
+// TODO: better, terrible things are here
+func (h *HTTPApi) setCommonHeaders(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+}
+
 // TODO: put marshal method on Graph
 func (h *HTTPApi) showGraph(w http.ResponseWriter, r *http.Request) {
 	ret, err := json.Marshal(h.m.Graph)
 	if err != nil {
 		logrus.Errorf("Unable to marshal Graph: %v", err)
 	} else {
-		w.Header().Set("Content-Type", "application/json")
+		h.setCommonHeaders(w)
 		w.Write(ret)
 	}
 }
@@ -46,7 +52,7 @@ func (h *HTTPApi) showNodes(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logrus.Errorf("Unable to marshal Graph.NodesMap: %v", err)
 	} else {
-		w.Header().Set("Content-Type", "application/json")
+		h.setCommonHeaders(w)
 		w.Write(ret)
 	}
 }
@@ -56,7 +62,7 @@ func (h *HTTPApi) showEdges(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logrus.Errorf("Unable to marshal Graph.LinksMap: %v", err)
 	} else {
-		w.Header().Set("Content-Type", "application/json")
+		h.setCommonHeaders(w)
 		w.Write(ret)
 	}
 }
@@ -66,7 +72,7 @@ func (h *HTTPApi) showRoutes(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logrus.Errorf("Unable to marshal Graph.RoutesMap: %v", err)
 	} else {
-		w.Header().Set("Content-Type", "application/json")
+		h.setCommonHeaders(w)
 		w.Write(ret)
 	}
 }
@@ -76,11 +82,13 @@ func (h *HTTPApi) showRouteMap(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logrus.Errorf("Unable to marshal RouteMap: %v", err)
 	} else {
-		w.Header().Set("Content-Type", "application/json")
+		h.setCommonHeaders(w)
 		w.Write(ret)
 	}
 }
 
+// TODO: have an event stream per API endpoint?
+// TODO: start with a dump of everything-- then all updates since then (to avoid races)
 // TODO: implement stream of events (removal/addition of graph elements, state changes,
 // routemap changes, etc.)
 func (h *HTTPApi) eventStream(w http.ResponseWriter, r *http.Request) {
