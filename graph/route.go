@@ -116,8 +116,14 @@ func (r *NetworkRoute) MarshalJSON() ([]byte, error) {
 	metrics := make(map[string]interface{})
 	metrics["numPoints"] = len(metricPoints)
 	if len(metricPoints) > 0 {
+		var totalLatency float64 = 0
+		for _, l := range latencies {
+			totalLatency += l
+		}
+		metrics["average"] = float64(totalLatency) / float64(len(metricPoints))
 		metrics["lossRate"] = float64(fail) / float64(len(metricPoints))
 	} else {
+		metrics["average"] = float64(0)
 		metrics["lossRate"] = float64(0)
 	}
 	if dev, err := stats.StandardDeviation(latencies); err == nil {
