@@ -10,6 +10,7 @@ Base parts:
 Parts TODO:
     - fault detection: using events from pinger/mapper correlate which links we
         think are having issues
+    - reverse map (get routes from peers??)
 
 General TODO:
     - Metrics
