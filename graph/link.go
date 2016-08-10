@@ -11,5 +11,5 @@ type NetworkLink struct {
 	Src *NetworkNode
 	Dst *NetworkNode
 
-	RefCount int
+	refCount int
 }

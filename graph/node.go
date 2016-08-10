@@ -11,5 +11,5 @@ type NetworkNode struct {
 	// TODO: use? attempt to parse string
 	Addr net.IP
 
-	RefCount int
+	refCount int
 }

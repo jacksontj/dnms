@@ -39,7 +39,7 @@ func (g *NetworkGraph) IncrNode(name string) *NetworkNode {
 		}
 		g.NodesMap[name] = n
 	}
-	n.RefCount++
+	n.refCount++
 	return n
 }
 
@@ -60,8 +60,8 @@ func (g *NetworkGraph) DecrNode(name string) {
 		return
 	}
 
-	n.RefCount--
-	if n.RefCount == 0 {
+	n.refCount--
+	if n.refCount == 0 {
 		delete(g.NodesMap, name)
 	}
 }
@@ -76,7 +76,7 @@ func (g *NetworkGraph) IncrLink(src, dst string) *NetworkLink {
 		}
 		g.LinksMap[key] = l
 	}
-	l.RefCount++
+	l.refCount++
 	return l
 }
 
@@ -98,8 +98,8 @@ func (g *NetworkGraph) DecrLink(src, dst string) {
 		return
 	}
 	// decrement ourselves
-	l.RefCount--
-	if l.RefCount == 0 {
+	l.refCount--
+	if l.refCount == 0 {
 		// Decrement our children
 		g.DecrNode(src)
 		g.DecrNode(dst)
@@ -140,7 +140,7 @@ func (g *NetworkGraph) IncrRoute(hops []string) *NetworkRoute {
 	}
 
 	// increment route's refcount
-	route.RefCount++
+	route.refCount++
 
 	return route
 }
@@ -162,8 +162,8 @@ func (g *NetworkGraph) DecrRoute(hops []string) {
 		return
 	}
 
-	r.RefCount--
-	if r.RefCount == 0 {
+	r.refCount--
+	if r.refCount == 0 {
 		// decrement all the links/nodes as well
 		for i, node := range r.Path {
 			g.DecrNode(node.Name)

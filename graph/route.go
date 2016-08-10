@@ -27,7 +27,7 @@ type NetworkRoute struct {
 	MetricRing *ring.Ring
 
 	// how many are refrencing it
-	RefCount int
+	refCount int
 }
 
 func (r *NetworkRoute) HandleACK(pass bool, latency int64) {
@@ -126,12 +126,10 @@ func (r *NetworkRoute) MarshalJSON() ([]byte, error) {
 
 	type Alias NetworkRoute
 	return json.Marshal(&struct {
-		RCount int
 		//MetricPoints []RoutePingResponse
 		Metrics map[string]interface{}
 		*Alias
 	}{
-		RCount: r.RefCount,
 		//MetricPoints: metricPoints,
 		Metrics: metrics,
 		Alias:   (*Alias)(r),
