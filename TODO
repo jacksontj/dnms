@@ -12,6 +12,14 @@ Parts TODO:
         think are having issues
 
 General TODO:
-    - keep track of ping success, fail, latency, etc.
     - Metrics
+        -- global counters (total)
+            - successful/failed pings
+            - successful/failed maps
+        -- gauges (current count)
+            -- current peers
+            -- current routes (+ per-state)
+            -- current nodes
+            -- current edges
+        -- some "graph" metrics (connectivity, etc.)
     - REST API endpoint
