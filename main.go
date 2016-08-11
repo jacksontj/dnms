@@ -34,8 +34,14 @@ func main() {
 	cfg.AdvertisePort = 33434
 	if *advertiseStr != "" {
 		cfg.AdvertiseAddr = *advertiseStr
-		logrus.Infof("addr: %v", *advertiseStr)
+	} else {
+		i, err := GetLocalIP()
+		if err != nil {
+			logrus.Fatalf("Err: %v", err)
+		}
+		cfg.AdvertiseAddr = i
 	}
+	logrus.Infof("AdvertiseAddr: %v", cfg.AdvertiseAddr)
 
 	// Create the memberlist with the config we just made
 	mlist, err := memberlist.Create(cfg)
