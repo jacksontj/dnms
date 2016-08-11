@@ -114,7 +114,7 @@ func (d *DNMSDelegate) NotifyJoin(n *memberlist.Node) {
 	logrus.Infof("Node joined %s", n.Addr.String())
 	// TOOD: check it isn't us? shouldn't be as that should be covered by our
 	// workaround up top
-	d.Mapper.AddPeer(mapper.Peer{
+	go d.Mapper.AddPeer(mapper.Peer{
 		Name: n.Addr.String(),
 		Port: int(n.Port),
 	})
@@ -124,7 +124,7 @@ func (d *DNMSDelegate) NotifyJoin(n *memberlist.Node) {
 // The Node argument must not be modified.
 func (d *DNMSDelegate) NotifyLeave(n *memberlist.Node) {
 	logrus.Infof("Node left %s", n.Addr.String())
-	d.Mapper.RemovePeer(mapper.Peer{
+	go d.Mapper.RemovePeer(mapper.Peer{
 		Name: n.Addr.String(),
 		Port: int(n.Port),
 	})

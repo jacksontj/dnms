@@ -1,6 +1,7 @@
 package mapper
 
 import (
+	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -18,9 +19,11 @@ type Peer struct {
 // Responsible for maintaining a `NetworkGraph` by mapping the network at
 // a configured interval
 type Mapper struct {
-	// TODO: locking around this. Right now if a peer drops off while a mapping task
-	// is completing the route ends up in here even though the peer is gone
-	peerMap map[string]*Peer
+	// locking around peers is important-- as there are background jobs mapping
+	// and we don't want them adding nodes back after we remove them
+	// TODO: more scoped lock? or goroutine?
+	peerMap  map[string]*Peer
+	peerLock *sync.RWMutex
 
 	// graph of the network
 	Graph *graph.NetworkGraph
@@ -33,12 +36,15 @@ func NewMapper() *Mapper {
 		peerMap:  make(map[string]*Peer),
 		Graph:    graph.Create(),
 		RouteMap: NewRouteMap(),
+		peerLock: &sync.RWMutex{},
 	}
 
 	return m
 }
 
 func (m *Mapper) AddPeer(p Peer) {
+	m.peerLock.Lock()
+	defer m.peerLock.Unlock()
 	_, ok := m.peerMap[p.Name]
 	if ok {
 		logrus.Warning("Mapper asked to add peer that already exists: %v", p)
@@ -49,16 +55,15 @@ func (m *Mapper) AddPeer(p Peer) {
 }
 
 func (m *Mapper) RemovePeer(p Peer) {
+	logrus.Infof("removing peer")
+	m.peerLock.Lock()
+	defer m.peerLock.Unlock()
 	_, ok := m.peerMap[p.Name]
 	if ok {
 		// TODO: better-- at least its all encapsualated here
 		// Remove routes from routemap
 		for _, route := range m.RouteMap.RemoveDst(p.Name) {
-			// Right now there is a race in removeDst -- which should get fixed
-			// We can either serialize removal of peers in a goroutine, or do
-			// locking (goroutine seems best)
 			if route == nil {
-				logrus.Infof("route was nil in removal???")
 				continue
 			}
 			m.Graph.DecrRoute(route.Hops())
@@ -139,14 +144,20 @@ func (m *Mapper) mapPeer(p *Peer) {
 
 		// If we don't have a current route, or the paths differ-- lets update
 		if currRoute == nil || !currRoute.SamePath(path) {
-			// Add new one
-			newRoute, _ := m.Graph.IncrRoute(path)
-			m.RouteMap.UpdateRouteOption(srcPort, p.Name, newRoute)
+			m.peerLock.RLock()
+			// check that this peer still exists
+			_, ok := m.peerMap[p.Name]
+			if ok {
+				// Add new one
+				newRoute, _ := m.Graph.IncrRoute(path)
+				m.RouteMap.UpdateRouteOption(srcPort, p.Name, newRoute)
 
-			// Remove old one if it exists
-			if currRoute != nil {
-				m.Graph.DecrRoute(currRoute.Hops())
+				// Remove old one if it exists
+				if currRoute != nil {
+					m.Graph.DecrRoute(currRoute.Hops())
+				}
 			}
+			m.peerLock.RUnlock()
 		}
 	}
 
