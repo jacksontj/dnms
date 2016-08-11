@@ -78,15 +78,15 @@ func (m *Mapper) RemovePeer(p Peer) {
 // TODO: better, since this will be concurrent
 func (m *Mapper) IterPeers(peerChan chan *Peer) {
 	go func() {
-	    // get list of peer keys
-	    pKeys := make([]string, 0, len(m.peerMap))
-	    for key := range m.peerMap {
-	        pKeys = append(pKeys, key)
-	    }
+		// get list of peer keys
+		pKeys := make([]string, 0, len(m.peerMap))
+		for key := range m.peerMap {
+			pKeys = append(pKeys, key)
+		}
 		for _, key := range pKeys {
-		    if peer, ok := m.peerMap[key]; ok {
-			    peerChan <- peer
-		    }
+			if peer, ok := m.peerMap[key]; ok {
+				peerChan <- peer
+			}
 		}
 
 		close(peerChan)
@@ -128,6 +128,7 @@ func (m *Mapper) mapPeer(p *Peer) {
 		options := traceroute.TracerouteOptions{}
 		options.SetSrcPort(srcPort) // TODO: config
 		options.SetDstPort(p.Port)  // TODO: config
+		options.SetMaxHops(20)
 
 		ret, err := traceroute.Traceroute(
 			p.Name, // TODO: take the IP direct
