@@ -11,6 +11,9 @@ Parts TODO:
     - fault detection: using events from pinger/mapper correlate which links we
         think are having issues
     - reverse map (get routes from peers??)
+    - aggregation
+        -- specific nodes that aggregate
+        -- route around nodes that can't talk to aggregation nodes
 
 General TODO:
     - Metrics
