@@ -4,6 +4,8 @@ import (
 	"flag"
 	"time"
 
+	_ "net/http/pprof"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/jacksontj/dnms/mapper"
 	"github.com/jacksontj/memberlist"

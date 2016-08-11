@@ -55,7 +55,6 @@ func (m *Mapper) AddPeer(p Peer) {
 }
 
 func (m *Mapper) RemovePeer(p Peer) {
-	logrus.Infof("removing peer")
 	m.peerLock.Lock()
 	defer m.peerLock.Unlock()
 	_, ok := m.peerMap[p.Name]
