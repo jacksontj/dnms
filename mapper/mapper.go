@@ -43,6 +43,7 @@ func NewMapper() *Mapper {
 }
 
 func (m *Mapper) AddPeer(p Peer) {
+	logrus.Infof("add peer: %v", p)
 	m.peerLock.Lock()
 	defer m.peerLock.Unlock()
 	_, ok := m.peerMap[p.Name]
@@ -77,8 +78,15 @@ func (m *Mapper) RemovePeer(p Peer) {
 // TODO: better, since this will be concurrent
 func (m *Mapper) IterPeers(peerChan chan *Peer) {
 	go func() {
-		for _, peer := range m.peerMap {
-			peerChan <- peer
+	    // get list of peer keys
+	    pKeys := make([]string, 0, len(m.peerMap))
+	    for key := range m.peerMap {
+	        pKeys = append(pKeys, key)
+	    }
+		for _, key := range pKeys {
+		    if peer, ok := m.peerMap[key]; ok {
+			    peerChan <- peer
+		    }
 		}
 
 		close(peerChan)

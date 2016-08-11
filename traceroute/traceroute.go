@@ -100,7 +100,7 @@ func Traceroute(dest string, options *TracerouteOptions, c ...chan TracerouteHop
 	ttl := 1
 	retry := 0
 	for {
-		//logrus.Println("TTL: ", ttl)
+		//logrus.Infof("dst: %s TTL: %v", dest, ttl)
 		start := time.Now()
 
 		// Set up the socket to receive inbound packets
