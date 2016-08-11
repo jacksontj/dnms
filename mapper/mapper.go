@@ -29,11 +29,13 @@ type Mapper struct {
 }
 
 func NewMapper() *Mapper {
-	return &Mapper{
+	m := &Mapper{
 		peerMap:  make(map[string]*Peer),
 		Graph:    graph.Create(),
 		RouteMap: NewRouteMap(),
 	}
+
+	return m
 }
 
 func (m *Mapper) AddPeer(p Peer) {

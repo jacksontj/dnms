@@ -6,11 +6,27 @@ import (
 	"net/http"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/donovanhide/eventsource"
+	"github.com/jacksontj/dnms/graph"
 	"github.com/jacksontj/dnms/mapper"
 )
 
 type HTTPApi struct {
 	m *mapper.Mapper
+
+	eventBroker *eventsource.Server
+}
+
+func NewHTTPApi(m *mapper.Mapper) *HTTPApi {
+	api := &HTTPApi{
+		m:           m,
+		eventBroker: eventsource.NewServer(),
+	}
+
+	// TODO: config
+	api.eventBroker.AllowCORS = true
+
+	return api
 }
 
 func (h *HTTPApi) Start() {
@@ -25,7 +41,28 @@ func (h *HTTPApi) Start() {
 	http.HandleFunc("/v1/routemap", h.showRouteMap)
 
 	// event endpoint
-	http.HandleFunc("/v1/events/graph", h.eventStreamGraph)
+	http.HandleFunc("/v1/events/graph", h.eventBroker.Handler("mapper"))
+
+	// Create event listener to pull events from mapper and push into eventBroker
+	go func() {
+		for {
+			// TODO: configurable buffer size?
+			c := make(chan *graph.Event, 100)
+			// subscriber
+			h.m.Graph.Subscribe(c)
+
+			for {
+				event, closed := <-c
+				// TODO: something to catch up? we'll have dropped events at least :/
+				if !closed {
+					logrus.Infof("Graph subscriber channel was closed, we might drop some messages")
+					break
+				}
+				h.eventBroker.Publish([]string{"mapper"}, event)
+			}
+		}
+
+	}()
 
 	go http.ListenAndServe(":12345", nil)
 }

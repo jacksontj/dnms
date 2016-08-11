@@ -60,7 +60,7 @@ func main() {
 
 	// TODO pass additional config
 	// Start HTTP API
-	api := HTTPApi{m}
+	api := NewHTTPApi(m)
 	api.Start()
 
 	// print state of the world for ease of debugging

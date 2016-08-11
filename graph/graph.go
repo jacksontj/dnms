@@ -10,7 +10,6 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
-// TODO: maintain some maps for easier lookup
 type NetworkGraph struct {
 	// nodeName -> Node
 	NodesMap map[string]*NetworkNode `json:"nodes"`
@@ -19,14 +18,55 @@ type NetworkGraph struct {
 	LinksMap map[string]*NetworkLink `json:"edges"`
 
 	RoutesMap map[string]*NetworkRoute `json:"routes"`
+
+	// event stuff
+	eventChannels     map[chan *Event]bool
+	eventRegistration chan chan *Event
+	internalEvents    chan *Event
 }
 
 func Create() *NetworkGraph {
-	return &NetworkGraph{
+	g := &NetworkGraph{
 		NodesMap:  make(map[string]*NetworkNode),
 		LinksMap:  make(map[string]*NetworkLink),
 		RoutesMap: make(map[string]*NetworkRoute),
+
+		eventChannels:     make(map[chan *Event]bool),
+		eventRegistration: make(chan chan *Event),
+		internalEvents:    make(chan *Event),
 	}
+
+	go g.publisher()
+
+	return g
+}
+
+// TODO: buffer messages?
+// goroutine target to do all the publishing of events
+func (g *NetworkGraph) publisher() {
+	for {
+		select {
+		case newChannel := <-g.eventRegistration:
+			g.eventChannels[newChannel] = true
+		case newEvent := <-g.internalEvents:
+			//logrus.Infof("got a new event! %v", newEvent)
+			for subscriberChannel := range g.eventChannels {
+				select {
+				case subscriberChannel <- newEvent:
+					//logrus.Infof("sent that event to a channel")
+				default:
+					//logrus.Infof("Unable to send event to that subscriber, killing")
+					delete(g.eventChannels, subscriberChannel)
+					close(subscriberChannel)
+				}
+			}
+		}
+	}
+}
+
+// add subscriber to our events
+func (g *NetworkGraph) Subscribe(c chan *Event) {
+	g.eventRegistration <- c
 }
 
 func (g *NetworkGraph) IncrNode(name string) (*NetworkNode, bool) {
@@ -35,6 +75,13 @@ func (g *NetworkGraph) IncrNode(name string) (*NetworkNode, bool) {
 	if !ok {
 		n = NewNetworkNode(name)
 		g.NodesMap[name] = n
+
+		// TODO: configurable sleep?
+		// sleep a little, hopefully the DNS lookup will finish
+		g.internalEvents <- &Event{
+			E:    addEvent,
+			Item: n,
+		}
 	}
 	n.refCount++
 	return n, !ok
@@ -60,6 +107,10 @@ func (g *NetworkGraph) DecrNode(name string) bool {
 	n.refCount--
 	if n.refCount == 0 {
 		delete(g.NodesMap, name)
+		g.internalEvents <- &Event{
+			E:    removeEvent,
+			Item: n,
+		}
 		return true
 	}
 	return false
@@ -76,6 +127,10 @@ func (g *NetworkGraph) IncrLink(src, dst string) (*NetworkLink, bool) {
 			Dst: dstNode,
 		}
 		g.LinksMap[key] = l
+		g.internalEvents <- &Event{
+			E:    addEvent,
+			Item: l,
+		}
 	}
 	l.refCount++
 	return l, !ok
@@ -105,6 +160,10 @@ func (g *NetworkGraph) DecrLink(src, dst string) bool {
 		g.DecrNode(src)
 		g.DecrNode(dst)
 		delete(g.LinksMap, key)
+		g.internalEvents <- &Event{
+			E:    removeEvent,
+			Item: l,
+		}
 		return true
 	}
 	return false
@@ -141,6 +200,11 @@ func (g *NetworkGraph) IncrRoute(hops []string) (*NetworkRoute, bool) {
 			metricRing: ring.New(10), // TODO: config
 		}
 		g.RoutesMap[key] = route
+
+		g.internalEvents <- &Event{
+			E:    addEvent,
+			Item: route,
+		}
 	}
 
 	// increment route's refcount
@@ -177,6 +241,10 @@ func (g *NetworkGraph) DecrRoute(hops []string) bool {
 		}
 
 		delete(g.RoutesMap, key)
+		g.internalEvents <- &Event{
+			E:    removeEvent,
+			Item: r,
+		}
 		return true
 	}
 	return false

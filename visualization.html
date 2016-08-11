@@ -219,52 +219,42 @@
         keepNodesOnTop();
 
 
-        /*
-        // callback for the changes in the network
-        var step = -1;
-        function nextval()
-        {
-            step++;
-            return 2000 + (1500*step); // initial time, wait time
-        }
-
-        setTimeout(function() {
-            graph.addLink('Alex', 'Sophia', '20');
-            keepNodesOnTop();
-        }, nextval());
-
-        setTimeout(function() {
-            graph.addLink('Sophia', 'Daniel', '20');
-            keepNodesOnTop();
-        }, nextval());
-
-        setTimeout(function() {
-            graph.addLink('Daniel', 'Alex', '20');
-            keepNodesOnTop();
-        }, nextval());
-
-        setTimeout(function() {
-            graph.addLink('Suzie', 'Daniel', '30');
-            keepNodesOnTop();
-        }, nextval());
-
-        setTimeout(function() {
-            graph.removeLink('Dylan', 'Mason');
-            graph.addLink('Dylan', 'Mason', '8');
-            keepNodesOnTop();
-        }, nextval());
-
-        setTimeout(function() {
-            graph.removeLink('Dylan', 'Emma');
-            graph.addLink('Dylan', 'Emma', '8');
-            keepNodesOnTop();
-        }, nextval());
-        */
-
     }
 
-    $.get( "http://127.0.0.1:12345/v1/graph", function( data ) {
+    // initial load of the graph
+    $.get("http://127.0.0.1:12345/v1/graph", function( data ) {
         drawGraph(data);
+
+        if (!!window.EventSource) {
+            var source = new EventSource('http://127.0.0.1:12345/v1/events/graph');
+
+            // All the event listeners
+            source.addEventListener('addNodeEvent', function(e) {
+                var data = JSON.parse(e.data);
+                graph.addNode(data.name);
+                keepNodesOnTop();
+            }, false);
+            source.addEventListener('removeNodeEvent', function(e) {
+                var data = JSON.parse(e.data);
+                graph.removeNode(data.name);
+                keepNodesOnTop();
+            }, false);
+
+            source.addEventListener('addLinkEvent', function(e) {
+                var data = JSON.parse(e.data);
+                graph.addLink(data.src.name, data.dst.name, '20');
+                keepNodesOnTop();
+            }, false);
+            source.addEventListener('removeLinkEvent', function(e) {
+                var data = JSON.parse(e.data);
+                graph.removeLink(data.src.name, data.dst.name);
+                keepNodesOnTop();
+            }, false);
+
+        } else {
+            // Result to xhr polling :(
+            console.log("sad")
+        }
     });
 
     // because of the way the network is created, nodes are created first, and links second,
