@@ -71,7 +71,6 @@ func (g *NetworkGraph) EventDumpChannel() chan *Event {
 	go func(c chan *Event) {
 		// dump nodes
 		for _, n := range g.NodesMap {
-			logrus.Infof("adding a node to EventDumpChannel")
 			c <- &Event{
 				E:    addEvent,
 				Item: n,
