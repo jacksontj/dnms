@@ -102,8 +102,8 @@
                 .attr("pointer-events", "all")
                 .attr("viewBox", "0 0 " + w + " " + h)
                 .attr("perserveAspectRatio", "xMinYMid")
-        var vis = svg
-            .append('svg:g');
+        var vis = svg.append('svg:g');
+
 
         window.addEventListener('resize', resize);
 
@@ -115,8 +115,8 @@
 
         var force = d3.layout.force();
 
-        var nodes = force.nodes(),
-                links = force.links();
+        var nodes = force.nodes()
+        var links = force.links();
 
         var update = function () {
             var link = vis.selectAll("line")
