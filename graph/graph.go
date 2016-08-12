@@ -64,6 +64,39 @@ func (g *NetworkGraph) publisher() {
 	}
 }
 
+// Dump everything in the NetworkGraph into a channel
+func (g *NetworkGraph) EventDumpChannel() chan *Event {
+	// TODO: buffer?
+	c := make(chan *Event)
+	go func(c chan *Event) {
+		// dump nodes
+		for _, n := range g.NodesMap {
+			logrus.Infof("adding a node to EventDumpChannel")
+			c <- &Event{
+				E:    addEvent,
+				Item: n,
+			}
+		}
+		// dump links
+		for _, l := range g.LinksMap {
+			c <- &Event{
+				E:    addEvent,
+				Item: l,
+			}
+		}
+		// dump routes
+		for _, route := range g.RoutesMap {
+			c <- &Event{
+				E:    addEvent,
+				Item: route,
+			}
+		}
+
+		close(c)
+	}(c)
+	return c
+}
+
 // add subscriber to our events
 func (g *NetworkGraph) Subscribe(c chan *Event) {
 	g.eventRegistration <- c

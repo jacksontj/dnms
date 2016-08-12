@@ -6,9 +6,9 @@ import (
 	"net/http"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/donovanhide/eventsource"
 	"github.com/jacksontj/dnms/graph"
 	"github.com/jacksontj/dnms/mapper"
+	"github.com/jacksontj/eventsource"
 )
 
 type HTTPApi struct {
@@ -41,7 +41,7 @@ func (h *HTTPApi) Start() {
 	http.HandleFunc("/v1/routemap", h.showRouteMap)
 
 	// event endpoint
-	http.HandleFunc("/v1/events/graph", h.eventBroker.Handler("mapper"))
+	http.HandleFunc("/v1/events/graph", h.eventStreamGraph)
 
 	// Create event listener to pull events from mapper and push into eventBroker
 	go func() {
@@ -129,7 +129,22 @@ func (h *HTTPApi) showRouteMap(w http.ResponseWriter, r *http.Request) {
 // TODO: implement stream of events (removal/addition of graph elements, state changes,
 // routemap changes, etc.)
 func (h *HTTPApi) eventStreamGraph(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("TODO"))
+	graphC := h.m.Graph.EventDumpChannel()
+	preloadChannel := make(chan eventsource.Event, 0)
+
+	// goroutine to Convert graph.Event to eventsource.Event
+	go func() {
+		for {
+			e, ok := <-graphC
+			if !ok {
+				break
+			}
+			preloadChannel <- e
+		}
+		close(preloadChannel)
+	}()
+	handler := h.eventBroker.Handler("mapper", preloadChannel)
+	handler(w, r)
 }
 
 func httpAPI(m *mapper.Mapper) {
