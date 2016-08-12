@@ -34,6 +34,7 @@ General TODO:
     - events
         -- updates: node/link/route
     - Route serialization needs to include src / dst
+    - Re-add refcount to objects (lets us see what the most connected nodes are easily)
 
 Metrics to figure out:
     - how many times a route flops over to a new one (route changes)
