@@ -26,7 +26,10 @@ General TODO:
             -- current nodes
             -- current edges
         -- some "graph" metrics (connectivity, etc.)
-    - directed d3js graph
+    - Better UI
+        -- directed d3js graph
+        -- separate views for graph vs routes etc.
+        -- visualization for latency / loss / etc
 
 
 scale TODO:
