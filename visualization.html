@@ -104,6 +104,17 @@
                 .attr("perserveAspectRatio", "xMinYMid")
         var vis = svg.append('svg:g');
 
+    svg.append("defs").append("marker")
+        .attr("id", "arrowhead")
+        .attr("refX", 6 + 3) /*must be smarter way to calculate shift*/
+        .attr("refY", 2)
+        .attr("markerWidth", 8)
+        .attr("markerHeight", 6)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("d", "M 0,0 V 4 L6,2 Z"); //this is actual shape for arrowhead
+
+
 
         window.addEventListener('resize', resize);
 
@@ -119,10 +130,10 @@
         var links = force.links();
 
         var update = function () {
-            var link = vis.selectAll("line")
-                    .data(links, function (d) {
-                        return d.source.id + "-" + d.target.id;
-                    });
+            var link = svg.selectAll(".link")
+              .data(links)
+              .attr("class", "link")
+              .attr("marker-end", "url(#arrowhead)");
 
             link.enter().append("line")
                     .attr("id", function (d) {
@@ -203,8 +214,6 @@
 
     graph = new myGraph("#svgdiv");
 
-    keepNodesOnTop();
-
     // initial load of the graph
     if (!!window.EventSource) {
         var source = new EventSource('http://127.0.0.1:12345/v1/events/graph');
@@ -213,23 +222,19 @@
         source.addEventListener('addNodeEvent', function(e) {
             var data = JSON.parse(e.data);
             graph.addNode(data.name);
-            keepNodesOnTop();
         }, false);
         source.addEventListener('removeNodeEvent', function(e) {
             var data = JSON.parse(e.data);
             graph.removeNode(data.name);
-            keepNodesOnTop();
         }, false);
 
         source.addEventListener('addLinkEvent', function(e) {
             var data = JSON.parse(e.data);
             graph.addLink(data.src.name, data.dst.name, '20');
-            keepNodesOnTop();
         }, false);
         source.addEventListener('removeLinkEvent', function(e) {
             var data = JSON.parse(e.data);
             graph.removeLink(data.src.name, data.dst.name);
-            keepNodesOnTop();
         }, false);
 
     } else {
@@ -237,16 +242,6 @@
         // Result to xhr polling :(
         console.log("sad, no event support!")
     }
-
-    // because of the way the network is created, nodes are created first, and links second,
-    // so the lines were on top of the nodes, this just reorders the DOM to put the svg:g on top
-    function keepNodesOnTop() {
-        $(".nodeStrokeClass").each(function( index ) {
-            var gnode = this.parentNode;
-            gnode.parentNode.appendChild(gnode);
-        });
-    }
-
 
 </script>
 </body>
