@@ -30,8 +30,7 @@ func (p *Pinger) Stop() {
 // ping all the things
 func (p *Pinger) PingPeers() {
 	for {
-		peerChan := make(chan *mapper.Peer)
-		p.M.IterPeers(peerChan)
+		peerChan := p.M.IterPeers()
 		for peer := range peerChan {
 			p.PingPeer(peer)
 			// TODO configurable rate

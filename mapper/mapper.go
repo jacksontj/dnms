@@ -76,7 +76,8 @@ func (m *Mapper) RemovePeer(p Peer) {
 }
 
 // TODO: better, since this will be concurrent
-func (m *Mapper) IterPeers(peerChan chan *Peer) {
+func (m *Mapper) IterPeers() chan *Peer {
+	peerChan := make(chan *Peer)
 	go func() {
 		// get list of peer keys
 		pKeys := make([]string, 0, len(m.peerMap))
@@ -91,6 +92,7 @@ func (m *Mapper) IterPeers(peerChan chan *Peer) {
 
 		close(peerChan)
 	}()
+	return peerChan
 }
 
 // Start the mapping
@@ -114,8 +116,7 @@ func (m *Mapper) mapPeers() {
 		srcPortEnd := 33500
 
 		for srcPort := srcPortStart; srcPort < srcPortEnd; srcPort++ {
-			peerChan := make(chan *Peer)
-			m.IterPeers(peerChan)
+			peerChan := m.IterPeers()
 			for peer := range peerChan {
 				m.mapPeer(peer, srcPort)
 				// TODO configurable rate

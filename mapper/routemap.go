@@ -38,6 +38,7 @@ func (r *RouteMap) FindRoute(path []string) (string, bool) {
 	return "", false
 }
 
+// TODO: embed the key in the route struct, so we can return a channel of *NetworkRoute
 func (r *RouteMap) IterRoutes(name string, keysChan chan string) {
 	go func() {
 		usedRoutes := make(map[*graph.NetworkRoute]interface{})
