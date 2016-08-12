@@ -96,25 +96,23 @@
 
         var svg = d3.select("body")
                 .append("svg:svg")
-                .attr("width", w)
-                .attr("height", h)
+                .attr("width", "100%")
+                .attr("height", "100%")
                 .attr("id", "svg")
                 .attr("pointer-events", "all")
                 .attr("viewBox", "0 0 " + w + " " + h)
                 .attr("perserveAspectRatio", "xMinYMid")
         var vis = svg.append('svg:g');
 
-    svg.append("defs").append("marker")
-        .attr("id", "arrowhead")
-        .attr("refX", 6 + 3) /*must be smarter way to calculate shift*/
-        .attr("refY", 2)
-        .attr("markerWidth", 8)
-        .attr("markerHeight", 6)
-        .attr("orient", "auto")
-        .append("path")
-        .attr("d", "M 0,0 V 4 L6,2 Z"); //this is actual shape for arrowhead
-
-
+        svg.append("defs").append("marker")
+            .attr("id", "arrowhead")
+            .attr("refX", 6 + 3) /*must be smarter way to calculate shift*/
+            .attr("refY", 2)
+            .attr("markerWidth", 8)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M 0,0 V 4 L6,2 Z"); //this is actual shape for arrowhead
 
         window.addEventListener('resize', resize);
 
