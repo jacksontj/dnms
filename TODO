@@ -34,7 +34,7 @@ General TODO:
         -- races when serializing JSON
     - events
         -- updates: node/link/route
-
+    - API for peer list
 
 Metrics to figure out:
     - how many times a route flops over to a new one (route changes)
