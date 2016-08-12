@@ -117,14 +117,6 @@
             .append("path")
             .attr("d", "M 0,0 V 4 L6,2 Z"); //this is actual shape for arrowhead
 
-        window.addEventListener('resize', resize);
-
-        function resize() {
-            width = window.innerWidth, height = window.innerHeight;
-            svg.attr("width", width).attr("height", height);
-            force.size([width, height]).resume();
-        }
-
         var force = d3.layout.force();
 
         var nodes = force.nodes()
