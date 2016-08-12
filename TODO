@@ -33,6 +33,7 @@ General TODO:
         -- races when serializing JSON
     - events
         -- updates: node/link/route
+    - Route serialization needs to include src / dst
 
 Metrics to figure out:
     - how many times a route flops over to a new one (route changes)
