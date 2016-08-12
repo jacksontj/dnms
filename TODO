@@ -37,3 +37,5 @@ General TODO:
 Metrics to figure out:
     - how many times a route flops over to a new one (route changes)
     - average routes per peer?
+    - average latency for a link
+        -- diff the times for ICMP between the 2 nodes, keep a rolling average
