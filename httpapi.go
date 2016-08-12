@@ -30,6 +30,9 @@ func NewHTTPApi(m *mapper.Mapper) *HTTPApi {
 }
 
 func (h *HTTPApi) Start() {
+	// TODO: think more about the namespacing of this API. Most thing belong to "mapper"
+	// but probably want to separate by "topology" "routing" or something like that
+
 	// TODO: use the better mux?
 	// Graph endpoints
 	http.HandleFunc("/v1/graph", h.showGraph)
@@ -37,12 +40,14 @@ func (h *HTTPApi) Start() {
 	http.HandleFunc("/v1/graph/edges", h.showEdges)
 	http.HandleFunc("/v1/graph/routes", h.showRoutes)
 
+	// all of our peers
+	http.HandleFunc("/v1/mapper/peers", h.showPeers)
+
 	// routemap endpoints
 	http.HandleFunc("/v1/routemap", h.showRouteMap)
 
 	// event endpoint
 	http.HandleFunc("/v1/events/graph", h.eventStreamGraph)
-
 	// Create event listener to pull events from mapper and push into eventBroker
 	go func() {
 		for {
@@ -108,6 +113,20 @@ func (h *HTTPApi) showRoutes(w http.ResponseWriter, r *http.Request) {
 	ret, err := json.Marshal(h.m.Graph.RoutesMap)
 	if err != nil {
 		logrus.Errorf("Unable to marshal Graph.RoutesMap: %v", err)
+	} else {
+		h.setCommonHeaders(w)
+		w.Write(ret)
+	}
+}
+
+func (h *HTTPApi) showPeers(w http.ResponseWriter, r *http.Request) {
+	peers := make([]*mapper.Peer, 0)
+	for peer := range h.m.IterPeers() {
+		peers = append(peers, peer)
+	}
+	ret, err := json.Marshal(peers)
+	if err != nil {
+		logrus.Errorf("Unable to marshal Peers: %v", err)
 	} else {
 		h.setCommonHeaders(w)
 		w.Write(ret)
