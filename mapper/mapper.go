@@ -105,68 +105,69 @@ func (m *Mapper) Stop() {
 
 // TODO: parallelize the individual peer mapping
 // Target for background goroutine responsible for doing the actual mapping
+// We specifically map all peers on a given port to effectively get breadth first
+// instead of depth first mapping
 func (m *Mapper) mapPeers() {
 	for {
-		peerChan := make(chan *Peer)
-		m.IterPeers(peerChan)
-		for peer := range peerChan {
-			m.mapPeer(peer)
-			// TODO configurable rate
-			time.Sleep(time.Second * 5)
+		// TODO: config
+		srcPortStart := 33435
+		srcPortEnd := 33500
+
+		for srcPort := srcPortStart; srcPort < srcPortEnd; srcPort++ {
+			peerChan := make(chan *Peer)
+			m.IterPeers(peerChan)
+			for peer := range peerChan {
+				m.mapPeer(peer, srcPort)
+				// TODO configurable rate
+				time.Sleep(time.Second)
+			}
 		}
 	}
 }
 
-// Map a single peer
-func (m *Mapper) mapPeer(p *Peer) {
-	// TODO: config
-	srcPortStart := 33435
-	srcPortEnd := 33500
+// Map a single peer on a single source port
+func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 
-	for srcPort := srcPortStart; srcPort < srcPortEnd; srcPort++ {
+	options := traceroute.TracerouteOptions{}
+	options.SetSrcPort(srcPort) // TODO: config
+	options.SetDstPort(p.Port)  // TODO: config
+	options.SetMaxHops(20)
 
-		options := traceroute.TracerouteOptions{}
-		options.SetSrcPort(srcPort) // TODO: config
-		options.SetDstPort(p.Port)  // TODO: config
-		options.SetMaxHops(20)
-
-		ret, err := traceroute.Traceroute(
-			p.Name, // TODO: take the IP direct
-			&options,
-		)
-		if err != nil {
-			logrus.Infof("Traceroute err: %v", err)
-			continue
-		}
-
-		logrus.Infof("Traceroute %d -> %s: complete", srcPort, p.Name)
-
-		path := make([]string, 0, len(ret.Hops))
-
-		for _, hop := range ret.Hops {
-			path = append(path, hop.AddressString())
-		}
-		logrus.Infof("traceroute path: %v", path)
-
-		currRoute := m.RouteMap.GetRouteOption(srcPort, p.Name)
-
-		// If we don't have a current route, or the paths differ-- lets update
-		if currRoute == nil || !currRoute.SamePath(path) {
-			m.peerLock.RLock()
-			// check that this peer still exists
-			_, ok := m.peerMap[p.Name]
-			if ok {
-				// Add new one
-				newRoute, _ := m.Graph.IncrRoute(path)
-				m.RouteMap.UpdateRouteOption(srcPort, p.Name, newRoute)
-
-				// Remove old one if it exists
-				if currRoute != nil {
-					m.Graph.DecrRoute(currRoute.Hops())
-				}
-			}
-			m.peerLock.RUnlock()
-		}
+	ret, err := traceroute.Traceroute(
+		p.Name, // TODO: take the IP direct
+		&options,
+	)
+	if err != nil {
+		logrus.Infof("Traceroute err: %v", err)
+		return
 	}
 
+	logrus.Infof("Traceroute %d -> %s: complete", srcPort, p.Name)
+
+	path := make([]string, 0, len(ret.Hops))
+
+	for _, hop := range ret.Hops {
+		path = append(path, hop.AddressString())
+	}
+	logrus.Infof("traceroute path: %v", path)
+
+	currRoute := m.RouteMap.GetRouteOption(srcPort, p.Name)
+
+	// If we don't have a current route, or the paths differ-- lets update
+	if currRoute == nil || !currRoute.SamePath(path) {
+		m.peerLock.RLock()
+		// check that this peer still exists
+		_, ok := m.peerMap[p.Name]
+		if ok {
+			// Add new one
+			newRoute, _ := m.Graph.IncrRoute(path)
+			m.RouteMap.UpdateRouteOption(srcPort, p.Name, newRoute)
+
+			// Remove old one if it exists
+			if currRoute != nil {
+				m.Graph.DecrRoute(currRoute.Hops())
+			}
+		}
+		m.peerLock.RUnlock()
+	}
 }

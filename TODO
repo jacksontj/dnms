@@ -32,10 +32,6 @@ General TODO:
         -- visualization for latency / loss / etc
 
 
-scale TODO:
-    - don't do all source port range for a particular map at once? as we add a lot of peers, adding every single route for a given peer might
-        not be as valuable as some from a new peer
-
 Metrics to figure out:
     - how many times a route flops over to a new one (route changes)
     - average routes per peer?
