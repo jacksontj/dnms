@@ -30,6 +30,10 @@ General TODO:
         -- directed d3js graph
         -- separate views for graph vs routes etc.
         -- visualization for latency / loss / etc
+    - Fix race conditions
+        -- races when serializing JSON
+    - events
+        -- updates: node/link/route
 
 
 Metrics to figure out:
