@@ -31,7 +31,6 @@ General TODO:
         -- visualization for latency / loss / etc
     - events
         -- updates: node/link/route
-    - Re-add refcount to objects (lets us see what the most connected nodes are easily)
     - IPv6 support (traceroute etc.)
 
 Metrics to figure out:
