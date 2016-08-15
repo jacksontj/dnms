@@ -44,7 +44,7 @@ func (h *HTTPApi) Start() {
 	http.HandleFunc("/v1/mapper/peers", h.showPeers)
 
 	// routemap endpoints
-	http.HandleFunc("/v1/routemap", h.showRouteMap)
+	http.HandleFunc("/v1/mapper/routemap", h.showRouteMap)
 
 	// event endpoint
 	http.HandleFunc("/v1/events/graph", h.eventStreamGraph)

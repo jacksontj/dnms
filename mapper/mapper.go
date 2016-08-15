@@ -1,6 +1,7 @@
 package mapper
 
 import (
+	"strconv"
 	"sync"
 	"time"
 
@@ -16,9 +17,14 @@ type Peer struct {
 	// TODO: addr etc.
 }
 
+func (p *Peer) String() string {
+	return p.Name + ":" + strconv.Itoa(p.Port)
+}
+
 // Responsible for maintaining a `NetworkGraph` by mapping the network at
 // a configured interval
 type Mapper struct {
+	localName string
 	// locking around peers is important-- as there are background jobs mapping
 	// and we don't want them adding nodes back after we remove them
 	// TODO: more scoped lock? or goroutine?
@@ -31,12 +37,13 @@ type Mapper struct {
 	RouteMap *RouteMap
 }
 
-func NewMapper() *Mapper {
+func NewMapper(n string) *Mapper {
 	m := &Mapper{
-		peerMap:  make(map[string]*Peer),
-		Graph:    graph.Create(),
-		RouteMap: NewRouteMap(),
-		peerLock: &sync.RWMutex{},
+		localName: n,
+		peerMap:   make(map[string]*Peer),
+		Graph:     graph.Create(),
+		RouteMap:  NewRouteMap(),
+		peerLock:  &sync.RWMutex{},
 	}
 
 	return m
@@ -62,7 +69,7 @@ func (m *Mapper) RemovePeer(p Peer) {
 	if ok {
 		// TODO: better-- at least its all encapsualated here
 		// Remove routes from routemap
-		for _, route := range m.RouteMap.RemoveDst(p.Name) {
+		for _, route := range m.RouteMap.RemoveDst(p.String()) {
 			if route == nil {
 				continue
 			}
@@ -157,7 +164,7 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 	}
 	logrus.Infof("traceroute path: %v", path)
 
-	currRoute := m.RouteMap.GetRouteOption(srcPort, p.Name)
+	currRoute := m.RouteMap.GetRouteOption(m.localName, srcPort, p.Name, p.Port)
 
 	// If we don't have a current route, or the paths differ-- lets update
 	if currRoute == nil || !currRoute.SamePath(path) {
@@ -167,7 +174,7 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 		if ok {
 			// Add new one
 			newRoute, _ := m.Graph.IncrRoute(path)
-			m.RouteMap.UpdateRouteOption(srcPort, p.Name, newRoute)
+			m.RouteMap.UpdateRouteOption(m.localName, srcPort, p.Name, p.Port, newRoute)
 
 			// Remove old one if it exists
 			if currRoute != nil {

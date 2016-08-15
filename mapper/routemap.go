@@ -2,6 +2,7 @@ package mapper
 
 // Map for port + node -> route
 import (
+	"encoding/json"
 	"strconv"
 	"sync"
 
@@ -11,20 +12,23 @@ import (
 
 // TODO: do our own route refcounting (up and down)
 type RouteMap struct {
-	// "srcPort:nodename" -> route
+	// key == srcName:srcPort,dstName:dstPort
+	// key -> route
 	NodeRouteMap map[string]*graph.NetworkRoute
 
-	// dstNodename -> NodeRouteMap-Key
-	nodeKeyMap map[string]map[string]interface{}
+	// dstNodeKey -> NodeRouteMap-Key
+	dstNodeMap map[string]map[string]interface{}
+
+	// TODO srcNodeMap
 
 	lock *sync.RWMutex
 }
 
 func NewRouteMap() *RouteMap {
 	return &RouteMap{
-		NodeRouteMap: make(map[string]*graph.NetworkRoute),
-		nodeKeyMap:   make(map[string]map[string]interface{}),
-		lock:         &sync.RWMutex{},
+		NodeRouteMap:   make(map[string]*graph.NetworkRoute),
+		dstNodeMap: make(map[string]map[string]interface{}),
+		lock:           &sync.RWMutex{},
 	}
 }
 
@@ -47,12 +51,12 @@ func (r *RouteMap) FindRoute(path []string) (string, bool) {
 }
 
 // TODO: embed the key in the route struct, so we can return a channel of *NetworkRoute
-func (r *RouteMap) IterRoutes(name string, keysChan chan string) {
+func (r *RouteMap) IterRoutes(dstKey string, keysChan chan string) {
 	go func() {
 		usedRoutes := make(map[*graph.NetworkRoute]interface{})
 
 		r.lock.RLock()
-		nodeMap, ok := r.nodeKeyMap[name]
+		nodeMap, ok := r.dstNodeMap[dstKey]
 		r.lock.RUnlock()
 		// If there is something, iterate over them and stick the key down the channel
 		if ok {
@@ -78,20 +82,20 @@ func (r *RouteMap) IterRoutes(name string, keysChan chan string) {
 	}()
 }
 
-func (r *RouteMap) addNodeKey(name, key string) {
-	nMap, ok := r.nodeKeyMap[name]
+func (r *RouteMap) addNodeKey(dstKey, key string) {
+	nMap, ok := r.dstNodeMap[dstKey]
 	if !ok {
 		nMap = make(map[string]interface{})
-		r.nodeKeyMap[name] = nMap
+		r.dstNodeMap[dstKey] = nMap
 	}
 
 	nMap[key] = struct{}{}
 }
 
-func (r *RouteMap) RemoveNodeKey(name, key string) {
+func (r *RouteMap) removeNodeKey(dstKey, key string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	nMap, ok := r.nodeKeyMap[name]
+	nMap, ok := r.dstNodeMap[dstKey]
 	if !ok {
 		return
 	}
@@ -99,8 +103,8 @@ func (r *RouteMap) RemoveNodeKey(name, key string) {
 	delete(nMap, key)
 }
 
-func (r *RouteMap) GetRouteOption(srcPort int, dst string) *graph.NetworkRoute {
-	key := strconv.Itoa(srcPort) + ":" + dst
+func (r *RouteMap) GetRouteOption(srcName string, srcPort int, dstName string, dstPort int) *graph.NetworkRoute {
+	key := srcName + ":" + strconv.Itoa(srcPort) + "," + dstName + ":" + strconv.Itoa(dstPort)
 
 	r.lock.RLock()
 	defer r.lock.RUnlock()
@@ -109,8 +113,8 @@ func (r *RouteMap) GetRouteOption(srcPort int, dst string) *graph.NetworkRoute {
 }
 
 //
-func (r *RouteMap) UpdateRouteOption(srcPort int, dst string, newRoute *graph.NetworkRoute) {
-	key := strconv.Itoa(srcPort) + ":" + dst
+func (r *RouteMap) UpdateRouteOption(srcName string, srcPort int, dstName string, dstPort int, newRoute *graph.NetworkRoute) {
+	key := srcName + ":" + strconv.Itoa(srcPort) + "," + dstName + ":" + strconv.Itoa(dstPort)
 
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -121,16 +125,16 @@ func (r *RouteMap) UpdateRouteOption(srcPort int, dst string, newRoute *graph.Ne
 	if !ok || route != newRoute {
 		r.NodeRouteMap[key] = newRoute
 	}
-	r.addNodeKey(dst, key)
+	r.addNodeKey(dstName+":"+strconv.Itoa(dstPort), key)
 }
 
-// TODO: make iterator? This isn't safe concurrency-wise right now
+// TODO: set port
 // TODO: do our own route refcounting
 // Remove all route options associated with dst
 func (r *RouteMap) RemoveDst(dst string) []*graph.NetworkRoute {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	nodeKeys, ok := r.nodeKeyMap[dst]
+	nodeKeys, ok := r.dstNodeMap[dst]
 	if !ok {
 		logrus.Warningf("Removing route options for a dst that isn't in the map: %s", dst)
 		return nil
@@ -142,4 +146,17 @@ func (r *RouteMap) RemoveDst(dst string) []*graph.NetworkRoute {
 		delete(r.NodeRouteMap, key)
 	}
 	return ret
+}
+
+// Fancy marshal method
+func (r *RouteMap) MarshalJSON() ([]byte, error) {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	type Alias RouteMap
+	return json.Marshal(&struct {
+		*Alias
+	}{
+		Alias: (*Alias)(r),
+	})
 }

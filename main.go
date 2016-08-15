@@ -19,17 +19,8 @@ func main() {
 
 	flag.Parse()
 
-	// Start the mapper (at this point no peers-- so it will do nothing)
-	m := mapper.NewMapper()
-	m.Start()
-
 	// #TODO: load from a config file
 	cfg := memberlist.DefaultLANConfig()
-
-	// Wire up the delegate-- he'll handle pings and node up/down events
-	delegate := NewDNMSDelegate(m)
-	cfg.Delegate = delegate
-	cfg.Events = delegate
 
 	// TODO: load from config
 	cfg.BindPort = 33434
@@ -44,6 +35,14 @@ func main() {
 		cfg.AdvertiseAddr = i
 	}
 	logrus.Infof("AdvertiseAddr: %v", cfg.AdvertiseAddr)
+
+	// Start the mapper (at this point no peers-- so it will do nothing)
+	m := mapper.NewMapper(cfg.AdvertiseAddr)
+	m.Start()
+	// Wire up the delegate-- he'll handle pings and node up/down events
+	delegate := NewDNMSDelegate(m)
+	cfg.Delegate = delegate
+	cfg.Events = delegate
 
 	// Create the memberlist with the config we just made
 	mlist, err := memberlist.Create(cfg)

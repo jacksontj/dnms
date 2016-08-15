@@ -41,7 +41,7 @@ func (p *Pinger) PingPeers() {
 
 func (p *Pinger) PingPeer(peer *mapper.Peer) {
 	c := make(chan string)
-	p.M.RouteMap.IterRoutes(peer.Name, c)
+	p.M.RouteMap.IterRoutes(peer.String(), c)
 	for routeKey := range c {
 		route := p.M.RouteMap.GetRoute(routeKey)
 		// TODO: better
