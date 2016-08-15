@@ -6,18 +6,22 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"io"
+	"sync"
 
 	"github.com/Sirupsen/logrus"
 )
 
 type NetworkGraph struct {
 	// nodeName -> Node
-	NodesMap map[string]*NetworkNode `json:"nodes"`
+	NodesMap  map[string]*NetworkNode `json:"nodes"`
+	nodesLock *sync.RWMutex
 
 	// nodeName,nodeName -> NetworkLink
-	LinksMap map[string]*NetworkLink `json:"edges"`
+	LinksMap  map[string]*NetworkLink `json:"edges"`
+	linksLock *sync.RWMutex
 
-	RoutesMap map[string]*NetworkRoute `json:"routes"`
+	RoutesMap  map[string]*NetworkRoute `json:"routes"`
+	routesLock *sync.RWMutex
 
 	// event stuff
 	eventChannels     map[chan *Event]bool
@@ -27,9 +31,12 @@ type NetworkGraph struct {
 
 func Create() *NetworkGraph {
 	g := &NetworkGraph{
-		NodesMap:  make(map[string]*NetworkNode),
-		LinksMap:  make(map[string]*NetworkLink),
-		RoutesMap: make(map[string]*NetworkRoute),
+		NodesMap:   make(map[string]*NetworkNode),
+		nodesLock:  &sync.RWMutex{},
+		LinksMap:   make(map[string]*NetworkLink),
+		linksLock:  &sync.RWMutex{},
+		RoutesMap:  make(map[string]*NetworkRoute),
+		routesLock: &sync.RWMutex{},
 
 		eventChannels:     make(map[chan *Event]bool),
 		eventRegistration: make(chan chan *Event),
@@ -64,6 +71,7 @@ func (g *NetworkGraph) publisher() {
 	}
 }
 
+// TODO: locking here
 // Dump everything in the NetworkGraph into a channel
 func (g *NetworkGraph) EventDumpChannel() chan *Event {
 	// TODO: buffer?
@@ -102,6 +110,8 @@ func (g *NetworkGraph) Subscribe(c chan *Event) {
 }
 
 func (g *NetworkGraph) IncrNode(name string) (*NetworkNode, bool) {
+	g.nodesLock.Lock()
+	defer g.nodesLock.Unlock()
 	n, ok := g.NodesMap[name]
 	// if this one doesn't exist, lets add it
 	if !ok {
@@ -120,15 +130,21 @@ func (g *NetworkGraph) IncrNode(name string) (*NetworkNode, bool) {
 }
 
 func (g *NetworkGraph) GetNode(name string) *NetworkNode {
+	g.nodesLock.RLock()
+	defer g.nodesLock.RUnlock()
 	n, _ := g.NodesMap[name]
 	return n
 }
 
 func (g *NetworkGraph) GetNodeCount() int {
+	g.nodesLock.RLock()
+	defer g.nodesLock.RUnlock()
 	return len(g.NodesMap)
 }
 
 func (g *NetworkGraph) DecrNode(name string) bool {
+	g.nodesLock.Lock()
+	defer g.nodesLock.Unlock()
 	n, ok := g.NodesMap[name]
 
 	if !ok {
@@ -150,6 +166,8 @@ func (g *NetworkGraph) DecrNode(name string) bool {
 
 func (g *NetworkGraph) IncrLink(src, dst string) (*NetworkLink, bool) {
 	key := src + "," + dst
+	g.linksLock.Lock()
+	defer g.linksLock.Unlock()
 	l, ok := g.LinksMap[key]
 	if !ok {
 		srcNode, _ := g.IncrNode(src)
@@ -169,17 +187,23 @@ func (g *NetworkGraph) IncrLink(src, dst string) (*NetworkLink, bool) {
 }
 
 func (g *NetworkGraph) GetLink(src, dst string) *NetworkLink {
+	g.linksLock.RLock()
+	defer g.linksLock.RUnlock()
 	key := src + "," + dst
 	l, _ := g.LinksMap[key]
 	return l
 }
 
 func (g *NetworkGraph) GetLinkCount() int {
+	g.linksLock.RLock()
+	defer g.linksLock.RUnlock()
 	return len(g.LinksMap)
 }
 
 func (g *NetworkGraph) DecrLink(src, dst string) bool {
 	key := src + "," + dst
+	g.linksLock.Lock()
+	defer g.linksLock.Unlock()
 	l, ok := g.LinksMap[key]
 	if !ok {
 		logrus.Warningf("Attempted to remove link %v which wasn't in the graph", key)
@@ -212,6 +236,9 @@ func (g *NetworkGraph) pathKey(hops []string) string {
 func (g *NetworkGraph) IncrRoute(hops []string) (*NetworkRoute, bool) {
 	key := g.pathKey(hops)
 
+	g.routesLock.Lock()
+	defer g.routesLock.Unlock()
+
 	// check if we have a route for this already
 	route, ok := g.RoutesMap[key]
 	// if we don't have it, lets make it
@@ -230,6 +257,7 @@ func (g *NetworkGraph) IncrRoute(hops []string) (*NetworkRoute, bool) {
 			Path:       path,
 			State:      Up,
 			metricRing: ring.New(10), // TODO: config
+			mLock:      &sync.RWMutex{},
 		}
 		g.RoutesMap[key] = route
 
@@ -246,15 +274,21 @@ func (g *NetworkGraph) IncrRoute(hops []string) (*NetworkRoute, bool) {
 }
 
 func (g *NetworkGraph) GetRoute(hops []string) *NetworkRoute {
+	g.routesLock.RLock()
+	defer g.routesLock.RUnlock()
 	r, _ := g.RoutesMap[g.pathKey(hops)]
 	return r
 }
 
 func (g *NetworkGraph) GetRouteCount() int {
+	g.routesLock.RLock()
+	defer g.routesLock.RUnlock()
 	return len(g.RoutesMap)
 }
 
 func (g *NetworkGraph) DecrRoute(hops []string) bool {
+	g.routesLock.Lock()
+	defer g.routesLock.Unlock()
 	key := g.pathKey(hops)
 	r, ok := g.RoutesMap[key]
 	if !ok {

@@ -29,11 +29,8 @@ General TODO:
     - Better UI
         -- separate views for graph vs routes etc.
         -- visualization for latency / loss / etc
-    - Fix race conditions
-        -- races when serializing JSON
     - events
         -- updates: node/link/route
-    - Route serialization needs to include src / dst
     - Re-add refcount to objects (lets us see what the most connected nodes are easily)
 
 Metrics to figure out:

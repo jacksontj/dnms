@@ -80,12 +80,17 @@ func (m *Mapper) IterPeers() chan *Peer {
 	peerChan := make(chan *Peer)
 	go func() {
 		// get list of peer keys
+		m.peerLock.RLock()
 		pKeys := make([]string, 0, len(m.peerMap))
 		for key := range m.peerMap {
 			pKeys = append(pKeys, key)
 		}
+		m.peerLock.RUnlock()
 		for _, key := range pKeys {
-			if peer, ok := m.peerMap[key]; ok {
+			m.peerLock.RLock()
+			peer, ok := m.peerMap[key]
+			m.peerLock.RUnlock()
+			if ok {
 				peerChan <- peer
 			}
 		}

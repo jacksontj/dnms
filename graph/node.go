@@ -2,7 +2,9 @@
 package graph
 
 import (
+	"encoding/json"
 	"net"
+	"sync"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -16,13 +18,15 @@ type NetworkNode struct {
 
 	// asynchronously loaded
 	DNSNames []string `json:"dns_names"`
+	nLock    *sync.RWMutex
 
 	refCount int
 }
 
 func NewNetworkNode(name string) *NetworkNode {
 	r := &NetworkNode{
-		Name: name,
+		Name:  name,
+		nLock: &sync.RWMutex{},
 	}
 
 	// background load DNS names
@@ -31,9 +35,24 @@ func NewNetworkNode(name string) *NetworkNode {
 		if err != nil {
 			logrus.Debugf("Unable to do reverse DNS lookup for %s", r.Name)
 		} else {
+			n.nLock.Lock()
 			n.DNSNames = names
+			n.nLock.Unlock()
 		}
 	}(r)
 
 	return r
+}
+
+// Fancy marshal method
+func (n *NetworkNode) MarshalJSON() ([]byte, error) {
+	n.nLock.RLock()
+	defer n.nLock.RUnlock()
+
+	type Alias NetworkNode
+	return json.Marshal(&struct {
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	})
 }

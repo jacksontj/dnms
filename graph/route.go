@@ -3,6 +3,7 @@ package graph
 import (
 	"container/ring"
 	"encoding/json"
+	"sync"
 
 	"github.com/montanaflynn/stats"
 )
@@ -26,12 +27,15 @@ type NetworkRoute struct {
 	State graphState `json:"state"` // TODO: better handle in the serialization
 	// TODO: race condition around this-- either lock it up, or goroutine it
 	metricRing *ring.Ring
+	mLock      *sync.RWMutex
 
 	// how many are refrencing it
 	refCount int
 }
 
 func (r *NetworkRoute) HandleACK(pass bool, latency int64) {
+	r.mLock.Lock()
+	defer r.mLock.Unlock()
 	r.metricRing.Value = RoutePingResponse{
 		Pass:    pass,
 		Latency: latency,
@@ -97,6 +101,7 @@ func (r *NetworkRoute) Hops() []string {
 
 // Fancy marshal method
 func (r *NetworkRoute) MarshalJSON() ([]byte, error) {
+	r.mLock.RLock()
 	// Convert MetricRing to a list of points
 	fail := 0
 	// TODO: re-add raw points
@@ -112,6 +117,7 @@ func (r *NetworkRoute) MarshalJSON() ([]byte, error) {
 			}
 		}
 	})
+	r.mLock.RUnlock()
 
 	// Do all metrics calculations here
 	metrics := make(map[string]interface{})
