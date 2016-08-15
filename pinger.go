@@ -48,9 +48,10 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		if route == nil {
 			continue
 		}
-		routeKeyParts := strings.SplitN(routeKey, ":", 2)
-		srcPort, _ := strconv.Atoi(routeKeyParts[0])
-		logrus.Debugf("Ping srcPort=%d dst=%s", srcPort, routeKeyParts[1])
+		routeKeyParts := strings.SplitN(routeKey, ",", 2)
+		srcKeyParts := strings.SplitN(routeKeyParts[0], ":", 2)
+		srcPort, _ := strconv.Atoi(srcKeyParts[1])
+		logrus.Debugf("Ping src=%s dst=%s", routeKeyParts[0], routeKeyParts[1])
 
 		p := ping{
 			SrcName:    p.Self.Name,
@@ -72,7 +73,7 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		buf[0] = byte(8) // TODO: add sendFrom API to memberlist
 		buf = append(buf, msg...)
 
-		LocalAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:"+routeKeyParts[0])
+		LocalAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:"+srcKeyParts[1])
 		if err != nil {
 			logrus.Errorf("unable to resolve source addr %v", err)
 		}
