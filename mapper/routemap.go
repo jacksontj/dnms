@@ -14,7 +14,7 @@ type RouteMap struct {
 	// "srcPort:nodename" -> route
 	NodeRouteMap map[string]*graph.NetworkRoute
 
-	// nodename -> NodeRouteMap-Key
+	// dstNodename -> NodeRouteMap-Key
 	nodeKeyMap map[string]map[string]interface{}
 
 	lock *sync.RWMutex
@@ -78,9 +78,7 @@ func (r *RouteMap) IterRoutes(name string, keysChan chan string) {
 	}()
 }
 
-func (r *RouteMap) AddNodeKey(name, key string) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+func (r *RouteMap) addNodeKey(name, key string) {
 	nMap, ok := r.nodeKeyMap[name]
 	if !ok {
 		nMap = make(map[string]interface{})
@@ -115,15 +113,15 @@ func (r *RouteMap) UpdateRouteOption(srcPort int, dst string, newRoute *graph.Ne
 	key := strconv.Itoa(srcPort) + ":" + dst
 
 	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	route, ok := r.NodeRouteMap[key]
 
 	// if it doesn't exist, lets make it
 	if !ok || route != newRoute {
 		r.NodeRouteMap[key] = newRoute
 	}
-	r.lock.Unlock()
-
-	r.AddNodeKey(dst, key)
+	r.addNodeKey(dst, key)
 }
 
 // TODO: make iterator? This isn't safe concurrency-wise right now
