@@ -134,7 +134,7 @@ func (h *HTTPApi) showPeers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPApi) showRouteMap(w http.ResponseWriter, r *http.Request) {
-	ret, err := json.Marshal(h.m.RouteMap.NodeRouteMap)
+	ret, err := json.Marshal(h.m.RouteMap)
 	if err != nil {
 		logrus.Errorf("Unable to marshal RouteMap: %v", err)
 	} else {

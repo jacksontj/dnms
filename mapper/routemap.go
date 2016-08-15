@@ -26,9 +26,9 @@ type RouteMap struct {
 
 func NewRouteMap() *RouteMap {
 	return &RouteMap{
-		NodeRouteMap:   make(map[string]*graph.NetworkRoute),
-		dstNodeMap: make(map[string]map[string]interface{}),
-		lock:           &sync.RWMutex{},
+		NodeRouteMap: make(map[string]*graph.NetworkRoute),
+		dstNodeMap:   make(map[string]map[string]interface{}),
+		lock:         &sync.RWMutex{},
 	}
 }
 
@@ -153,10 +153,6 @@ func (r *RouteMap) MarshalJSON() ([]byte, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
-	type Alias RouteMap
-	return json.Marshal(&struct {
-		*Alias
-	}{
-		Alias: (*Alias)(r),
-	})
+	// just return the map (the rest are really just indexes)
+	return json.Marshal(r.NodeRouteMap)
 }

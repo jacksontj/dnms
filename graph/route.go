@@ -102,6 +102,7 @@ func (r *NetworkRoute) Hops() []string {
 // Fancy marshal method
 func (r *NetworkRoute) MarshalJSON() ([]byte, error) {
 	r.mLock.RLock()
+	defer r.mLock.RUnlock()
 	// Convert MetricRing to a list of points
 	fail := 0
 	// TODO: re-add raw points
@@ -117,7 +118,6 @@ func (r *NetworkRoute) MarshalJSON() ([]byte, error) {
 			}
 		}
 	})
-	r.mLock.RUnlock()
 
 	// Do all metrics calculations here
 	metrics := make(map[string]interface{})
