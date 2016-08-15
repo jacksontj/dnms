@@ -174,7 +174,7 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 		if ok {
 			// Add new one
 			newRoute, _ := m.Graph.IncrRoute(path)
-			m.RouteMap.UpdateRouteOption(m.localName, srcPort, p.Name, p.Port, newRoute)
+			m.RouteMap.UpdateRouteOption(m.localName, srcPort, p.String(), newRoute)
 
 			// Remove old one if it exists
 			if currRoute != nil {

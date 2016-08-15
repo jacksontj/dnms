@@ -113,8 +113,8 @@ func (r *RouteMap) GetRouteOption(srcName string, srcPort int, dstName string, d
 }
 
 //
-func (r *RouteMap) UpdateRouteOption(srcName string, srcPort int, dstName string, dstPort int, newRoute *graph.NetworkRoute) {
-	key := srcName + ":" + strconv.Itoa(srcPort) + "," + dstName + ":" + strconv.Itoa(dstPort)
+func (r *RouteMap) UpdateRouteOption(srcName string, srcPort int, dst string, newRoute *graph.NetworkRoute) {
+	key := srcName + ":" + strconv.Itoa(srcPort) + "," + dst
 
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -125,7 +125,7 @@ func (r *RouteMap) UpdateRouteOption(srcName string, srcPort int, dstName string
 	if !ok || route != newRoute {
 		r.NodeRouteMap[key] = newRoute
 	}
-	r.addNodeKey(dstName+":"+strconv.Itoa(dstPort), key)
+	r.addNodeKey(dst, key)
 }
 
 // TODO: set port
