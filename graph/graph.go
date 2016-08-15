@@ -286,14 +286,14 @@ func (g *NetworkGraph) GetRouteCount() int {
 	return len(g.RoutesMap)
 }
 
-func (g *NetworkGraph) DecrRoute(hops []string) bool {
+func (g *NetworkGraph) DecrRoute(hops []string) (*NetworkRoute, bool) {
 	g.routesLock.Lock()
 	defer g.routesLock.Unlock()
 	key := g.pathKey(hops)
 	r, ok := g.RoutesMap[key]
 	if !ok {
 		logrus.Warningf("Attempted to remove route %v which wasn't in the graph", key)
-		return false
+		return nil, false
 	}
 
 	r.refCount--
@@ -311,7 +311,7 @@ func (g *NetworkGraph) DecrRoute(hops []string) bool {
 			E:    removeEvent,
 			Item: r,
 		}
-		return true
+		return r, true
 	}
-	return false
+	return r, false
 }

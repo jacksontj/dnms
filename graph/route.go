@@ -2,7 +2,10 @@ package graph
 
 import (
 	"container/ring"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
+	"io"
 	"sync"
 
 	"github.com/montanaflynn/stats"
@@ -31,6 +34,14 @@ type NetworkRoute struct {
 
 	// how many are refrencing it
 	refCount int
+}
+
+func (r *NetworkRoute) Key() string {
+	h := md5.New()
+	for _, node := range r.Path {
+		io.WriteString(h, node.Name)
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func (r *NetworkRoute) HandleACK(pass bool, latency int64) {
