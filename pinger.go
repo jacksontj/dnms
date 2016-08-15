@@ -95,7 +95,7 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		// in memberlist
 		conn.Write(buf)
 
-		// TODO: get a response from the ping
+		// get a response from the ping
 		retBuf := make([]byte, 2048)
 		readRet, err := conn.Read(retBuf)
 
