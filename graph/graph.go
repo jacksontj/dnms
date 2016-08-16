@@ -14,14 +14,14 @@ import (
 type NetworkGraph struct {
 	// nodeName -> Node
 	NodesMap  map[string]*NetworkNode `json:"nodes"`
-	nodesLock *sync.RWMutex
+	NodesLock *sync.RWMutex
 
 	// nodeName,nodeName -> NetworkLink
 	LinksMap  map[string]*NetworkLink `json:"edges"`
-	linksLock *sync.RWMutex
+	LinksLock *sync.RWMutex
 
 	RoutesMap  map[string]*NetworkRoute `json:"routes"`
-	routesLock *sync.RWMutex
+	RoutesLock *sync.RWMutex
 
 	// event stuff
 	eventChannels     map[chan *Event]bool
@@ -32,11 +32,11 @@ type NetworkGraph struct {
 func Create() *NetworkGraph {
 	g := &NetworkGraph{
 		NodesMap:   make(map[string]*NetworkNode),
-		nodesLock:  &sync.RWMutex{},
+		NodesLock:  &sync.RWMutex{},
 		LinksMap:   make(map[string]*NetworkLink),
-		linksLock:  &sync.RWMutex{},
+		LinksLock:  &sync.RWMutex{},
 		RoutesMap:  make(map[string]*NetworkRoute),
-		routesLock: &sync.RWMutex{},
+		RoutesLock: &sync.RWMutex{},
 
 		eventChannels:     make(map[chan *Event]bool),
 		eventRegistration: make(chan chan *Event),
@@ -110,8 +110,8 @@ func (g *NetworkGraph) Subscribe(c chan *Event) {
 }
 
 func (g *NetworkGraph) IncrNode(name string) (*NetworkNode, bool) {
-	g.nodesLock.Lock()
-	defer g.nodesLock.Unlock()
+	g.NodesLock.Lock()
+	defer g.NodesLock.Unlock()
 	n, ok := g.NodesMap[name]
 	// if this one doesn't exist, lets add it
 	if !ok {
@@ -131,21 +131,21 @@ func (g *NetworkGraph) IncrNode(name string) (*NetworkNode, bool) {
 }
 
 func (g *NetworkGraph) GetNode(name string) *NetworkNode {
-	g.nodesLock.RLock()
-	defer g.nodesLock.RUnlock()
+	g.NodesLock.RLock()
+	defer g.NodesLock.RUnlock()
 	n, _ := g.NodesMap[name]
 	return n
 }
 
 func (g *NetworkGraph) GetNodeCount() int {
-	g.nodesLock.RLock()
-	defer g.nodesLock.RUnlock()
+	g.NodesLock.RLock()
+	defer g.NodesLock.RUnlock()
 	return len(g.NodesMap)
 }
 
 func (g *NetworkGraph) DecrNode(name string) bool {
-	g.nodesLock.Lock()
-	defer g.nodesLock.Unlock()
+	g.NodesLock.Lock()
+	defer g.NodesLock.Unlock()
 	n, ok := g.NodesMap[name]
 
 	if !ok {
@@ -167,8 +167,8 @@ func (g *NetworkGraph) DecrNode(name string) bool {
 
 func (g *NetworkGraph) IncrLink(src, dst string) (*NetworkLink, bool) {
 	key := src + "," + dst
-	g.linksLock.Lock()
-	defer g.linksLock.Unlock()
+	g.LinksLock.Lock()
+	defer g.LinksLock.Unlock()
 	l, ok := g.LinksMap[key]
 	if !ok {
 		srcNode, _ := g.IncrNode(src)
@@ -188,23 +188,23 @@ func (g *NetworkGraph) IncrLink(src, dst string) (*NetworkLink, bool) {
 }
 
 func (g *NetworkGraph) GetLink(src, dst string) *NetworkLink {
-	g.linksLock.RLock()
-	defer g.linksLock.RUnlock()
+	g.LinksLock.RLock()
+	defer g.LinksLock.RUnlock()
 	key := src + "," + dst
 	l, _ := g.LinksMap[key]
 	return l
 }
 
 func (g *NetworkGraph) GetLinkCount() int {
-	g.linksLock.RLock()
-	defer g.linksLock.RUnlock()
+	g.LinksLock.RLock()
+	defer g.LinksLock.RUnlock()
 	return len(g.LinksMap)
 }
 
 func (g *NetworkGraph) DecrLink(src, dst string) bool {
 	key := src + "," + dst
-	g.linksLock.Lock()
-	defer g.linksLock.Unlock()
+	g.LinksLock.Lock()
+	defer g.LinksLock.Unlock()
 	l, ok := g.LinksMap[key]
 	if !ok {
 		logrus.Warningf("Attempted to remove link %v which wasn't in the graph", key)
@@ -237,8 +237,8 @@ func (g *NetworkGraph) pathKey(hops []string) string {
 func (g *NetworkGraph) IncrRoute(hops []string) (*NetworkRoute, bool) {
 	key := g.pathKey(hops)
 
-	g.routesLock.Lock()
-	defer g.routesLock.Unlock()
+	g.RoutesLock.Lock()
+	defer g.RoutesLock.Unlock()
 
 	// check if we have a route for this already
 	route, ok := g.RoutesMap[key]
@@ -275,21 +275,21 @@ func (g *NetworkGraph) IncrRoute(hops []string) (*NetworkRoute, bool) {
 }
 
 func (g *NetworkGraph) GetRoute(hops []string) *NetworkRoute {
-	g.routesLock.RLock()
-	defer g.routesLock.RUnlock()
+	g.RoutesLock.RLock()
+	defer g.RoutesLock.RUnlock()
 	r, _ := g.RoutesMap[g.pathKey(hops)]
 	return r
 }
 
 func (g *NetworkGraph) GetRouteCount() int {
-	g.routesLock.RLock()
-	defer g.routesLock.RUnlock()
+	g.RoutesLock.RLock()
+	defer g.RoutesLock.RUnlock()
 	return len(g.RoutesMap)
 }
 
 func (g *NetworkGraph) DecrRoute(hops []string) (*NetworkRoute, bool) {
-	g.routesLock.Lock()
-	defer g.routesLock.Unlock()
+	g.RoutesLock.Lock()
+	defer g.RoutesLock.Unlock()
 	key := g.pathKey(hops)
 	r, ok := g.RoutesMap[key]
 	if !ok {
