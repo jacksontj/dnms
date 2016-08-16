@@ -35,19 +35,20 @@ func (h *HTTPApi) Start() {
 
 	// TODO: use the better mux?
 	// Graph endpoints
-	http.HandleFunc("/v1/graph", h.showGraph)
-	http.HandleFunc("/v1/graph/nodes", h.showNodes)
-	http.HandleFunc("/v1/graph/edges", h.showEdges)
-	http.HandleFunc("/v1/graph/routes", h.showRoutes)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/graph", h.showGraph)
+	mux.HandleFunc("/v1/graph/nodes", h.showNodes)
+	mux.HandleFunc("/v1/graph/edges", h.showEdges)
+	mux.HandleFunc("/v1/graph/routes", h.showRoutes)
 
 	// all of our peers
-	http.HandleFunc("/v1/mapper/peers", h.showPeers)
+	mux.HandleFunc("/v1/mapper/peers", h.showPeers)
 
 	// routemap endpoints
-	http.HandleFunc("/v1/mapper/routemap", h.showRouteMap)
+	mux.HandleFunc("/v1/mapper/routemap", h.showRouteMap)
 
 	// event endpoint
-	http.HandleFunc("/v1/events/graph", h.eventStreamGraph)
+	mux.HandleFunc("/v1/events/graph", h.eventStreamGraph)
 	// Create event listener to pull events from mapper and push into eventBroker
 	go func() {
 		for {
@@ -69,7 +70,7 @@ func (h *HTTPApi) Start() {
 
 	}()
 
-	go http.ListenAndServe(":12345", nil)
+	go http.ListenAndServe(":12345", mux)
 }
 
 // TODO: better, terrible things are here

@@ -1,5 +1,5 @@
 // TODO: separate package (to avoid namespace collisions)
-package main
+package aggregator
 
 import (
 	"encoding/json"
@@ -35,13 +35,14 @@ func (h *HTTPApi) Start() {
 
 	// TODO: use the better mux?
 	// Graph endpoints
-	http.HandleFunc("/v1/graph", h.showGraph)
-	http.HandleFunc("/v1/graph/nodes", h.showNodes)
-	http.HandleFunc("/v1/graph/edges", h.showEdges)
-	http.HandleFunc("/v1/graph/routes", h.showRoutes)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/graph", h.showGraph)
+	mux.HandleFunc("/v1/graph/nodes", h.showNodes)
+	mux.HandleFunc("/v1/graph/edges", h.showEdges)
+	mux.HandleFunc("/v1/graph/routes", h.showRoutes)
 
 	// event endpoint
-	http.HandleFunc("/v1/events/graph", h.eventStreamGraph)
+	mux.HandleFunc("/v1/events/graph", h.eventStreamGraph)
 	// Create event listener to pull events from mapper and push into eventBroker
 	go func() {
 		for {
@@ -63,7 +64,7 @@ func (h *HTTPApi) Start() {
 
 	}()
 
-	go http.ListenAndServe(":8888", nil)
+	go http.ListenAndServe(":8888", mux)
 }
 
 // TODO: better, terrible things are here

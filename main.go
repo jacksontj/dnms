@@ -7,6 +7,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/jacksontj/dnms/aggregator"
 	"github.com/jacksontj/dnms/mapper"
 	"github.com/jacksontj/memberlist"
 )
@@ -16,6 +17,7 @@ func main() {
 
 	advertiseStr := flag.String("gossipAddr", "", "address to advertise gossip on")
 	peerStr := flag.String("peer", "", "address to gossip with")
+	aggNode := flag.Bool("aggregator", false, "are you an aggregator node?")
 
 	flag.Parse()
 
@@ -39,8 +41,17 @@ func main() {
 	// Start the mapper (at this point no peers-- so it will do nothing)
 	m := mapper.NewMapper(cfg.AdvertiseAddr)
 	m.Start()
+
+	// If we are an aggregator start that
+	var aggMap *aggregator.PeerGraphMap
+	if *aggNode {
+		aggMap = aggregator.NewPeerGraphMap()
+		api := aggregator.NewHTTPApi(aggMap)
+		api.Start()
+	}
+
 	// Wire up the delegate-- he'll handle pings and node up/down events
-	delegate := NewDNMSDelegate(m)
+	delegate := NewDNMSDelegate(m, aggMap)
 	cfg.Delegate = delegate
 	cfg.Events = delegate
 

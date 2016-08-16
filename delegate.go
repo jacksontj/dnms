@@ -4,19 +4,27 @@ import (
 	"net"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/jacksontj/dnms/aggregator"
 	"github.com/jacksontj/dnms/mapper"
 	"github.com/jacksontj/memberlist"
 )
 
 type DNMSDelegate struct {
+	// for us to map things
 	Mapper *mapper.Mapper
+
+	// for aggregation
+	AggMap   *aggregator.PeerGraphMap
+	peerSubs map[*memberlist.Node]chan bool
 
 	Mlist *memberlist.Memberlist
 }
 
-func NewDNMSDelegate(m *mapper.Mapper) *DNMSDelegate {
+func NewDNMSDelegate(m *mapper.Mapper, a *aggregator.PeerGraphMap) *DNMSDelegate {
 	return &DNMSDelegate{
-		Mapper: m,
+		Mapper:   m,
+		AggMap:   a,
+		peerSubs: make(map[*memberlist.Node]chan bool),
 	}
 }
 
@@ -118,6 +126,16 @@ func (d *DNMSDelegate) NotifyJoin(n *memberlist.Node) {
 		Name: n.Addr.String(),
 		Port: int(n.Port),
 	})
+
+	// if we are an aggregator
+	if d.AggMap != nil {
+		if _, ok := d.peerSubs[n]; ok {
+			logrus.Infof("Node joined that we are already subscribed to!")
+			return
+		}
+		c := aggregator.Subscribe(d.AggMap, "http://"+n.Addr.String()+":12345/v1/events/graph")
+		d.peerSubs[n] = c
+	}
 }
 
 // NotifyLeave is invoked when a node is detected to have left.
@@ -128,6 +146,15 @@ func (d *DNMSDelegate) NotifyLeave(n *memberlist.Node) {
 		Name: n.Addr.String(),
 		Port: int(n.Port),
 	})
+	// if we are an aggregator
+	if d.AggMap != nil {
+		if exitChan, ok := d.peerSubs[n]; !ok {
+			logrus.Infof("Node leaving that we aren't subscribed to!")
+		} else {
+			exitChan <- true
+			delete(d.peerSubs, n)
+		}
+	}
 }
 
 // NotifyUpdate is invoked when a node is detected to have
