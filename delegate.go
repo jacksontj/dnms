@@ -15,6 +15,8 @@ type DNMSDelegate struct {
 
 	// for aggregation
 	AggMap   *aggregator.PeerGraphMap
+	// TODO: move peerSubs into the PeerGraphMap ?
+	// TODO: locking?
 	peerSubs map[*memberlist.Node]chan bool
 
 	Mlist *memberlist.Memberlist
@@ -129,6 +131,7 @@ func (d *DNMSDelegate) NotifyJoin(n *memberlist.Node) {
 
 	// if we are an aggregator
 	if d.AggMap != nil {
+		d.AggMap.AddPeer(n.Addr.String())
 		if _, ok := d.peerSubs[n]; ok {
 			logrus.Infof("Node joined that we are already subscribed to!")
 			return
@@ -154,6 +157,7 @@ func (d *DNMSDelegate) NotifyLeave(n *memberlist.Node) {
 			exitChan <- true
 			delete(d.peerSubs, n)
 		}
+		d.AggMap.RemovePeer(n.Addr.String())
 	}
 }
 

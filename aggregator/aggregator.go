@@ -50,8 +50,7 @@ func (p *PeerGraphMap) removeRoute(peer string, r *graph.NetworkRoute) {
 	}
 }
 
-// TODO: use
-func (p *PeerGraphMap) addPeer(peer string) {
+func (p *PeerGraphMap) AddPeer(peer string) {
 	p.mapLock.Lock()
 	defer p.mapLock.Unlock()
 	pmap, ok := p.peerRouteMap[peer]
@@ -62,7 +61,7 @@ func (p *PeerGraphMap) addPeer(peer string) {
 }
 
 // remove all routes associated with a peer
-func (p *PeerGraphMap) removePeer(peer string) {
+func (p *PeerGraphMap) RemovePeer(peer string) {
 	p.mapLock.Lock()
 	defer p.mapLock.Unlock()
 	pmap, ok := p.peerRouteMap[peer]
