@@ -243,7 +243,7 @@ func (g *NetworkGraph) IncrRoute(hops []string) (*NetworkRoute, bool) {
 	route, ok := g.RoutesMap[key]
 	// if we don't have it, lets make it
 	if !ok {
-		logrus.Infof("New Route: key=%s %v", key, hops)
+		logrus.Debugf("New Route: key=%s %v", key, hops)
 		path := make([]*NetworkNode, 0, len(hops))
 		for i, hop := range hops {
 			hopNode, _ := g.IncrNode(hop)

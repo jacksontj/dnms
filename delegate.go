@@ -14,7 +14,7 @@ type DNMSDelegate struct {
 	Mapper *mapper.Mapper
 
 	// for aggregation
-	AggMap   *aggregator.PeerGraphMap
+	AggMap *aggregator.PeerGraphMap
 	// TODO: move peerSubs into the PeerGraphMap ?
 	// TODO: locking?
 	peerSubs map[*memberlist.Node]chan bool
