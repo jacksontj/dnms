@@ -118,8 +118,9 @@ func (g *NetworkGraph) IncrNode(name string) (*NetworkNode, bool) {
 		n = NewNetworkNode(name)
 		g.NodesMap[name] = n
 
-		// TODO: configurable sleep?
-		// sleep a little, hopefully the DNS lookup will finish
+		// TODO: there is an obvious race here-- the NewNetworkNode() call spawns
+		// a gouroutine in the background-- we need to either hold the event (ordering problems)
+		// or send an update event after the fact
 		g.internalEvents <- &Event{
 			E:    addEvent,
 			Item: n,
