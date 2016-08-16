@@ -10,10 +10,10 @@ import (
 
 // Subscripe to dest, consuming events into PeerGraphMap.
 // We'll return a bool channel which can be used to cancel the subscription
-func Subscribe(p *PeerGraphMap, dest string) chan bool {
+func Subscribe(p *PeerGraphMap, peer string) chan bool {
 	exitChan := make(chan bool)
 	go func() {
-		stream, err := eventsource.Subscribe(dest, "")
+		stream, err := eventsource.Subscribe("http://"+peer+":12345/v1/events/graph", "")
 		if err != nil {
 			logrus.Fatalf("Error subscribing: %v", err)
 		}
@@ -25,11 +25,11 @@ func Subscribe(p *PeerGraphMap, dest string) chan bool {
 				case "addRouteEvent":
 					r := graph.NetworkRoute{}
 					json.Unmarshal([]byte(ev.Data()), &r)
-					p.addRoute("peer", &r)
+					p.addRoute(peer, &r)
 				case "removeRouteEvent":
 					r := graph.NetworkRoute{}
 					json.Unmarshal([]byte(ev.Data()), &r)
-					p.removeRoute("peer", &r)
+					p.removeRoute(peer, &r)
 				}
 			case <-exitChan:
 				return

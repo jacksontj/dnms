@@ -54,7 +54,7 @@ func main() {
 		api := aggregator.NewHTTPApi(aggMap)
 		api.Start()
 		// subscribe to ourself
-		aggregator.Subscribe(aggMap, "http://127.0.0.1:12345/v1/events/graph")
+		aggregator.Subscribe(aggMap, "127.0.0.1")
 	}
 
 	// Wire up the delegate-- he'll handle pings and node up/down events

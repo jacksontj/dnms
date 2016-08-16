@@ -74,4 +74,5 @@ func (p *PeerGraphMap) RemovePeer(peer string) {
 			p.Graph.DecrRoute(route.Hops())
 		}
 	}
+	delete(p.peerRouteMap, peer)
 }

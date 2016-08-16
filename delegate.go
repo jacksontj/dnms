@@ -136,7 +136,7 @@ func (d *DNMSDelegate) NotifyJoin(n *memberlist.Node) {
 			logrus.Infof("Node joined that we are already subscribed to!")
 			return
 		}
-		c := aggregator.Subscribe(d.AggMap, "http://"+n.Addr.String()+":12345/v1/events/graph")
+		c := aggregator.Subscribe(d.AggMap, n.Addr.String())
 		d.peerSubs[n] = c
 	}
 }
