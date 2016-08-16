@@ -1,6 +1,8 @@
 package aggregator
 
 import (
+	"sync"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/jacksontj/dnms/graph"
 )
@@ -9,6 +11,7 @@ import (
 type PeerGraphMap struct {
 	// map of peer -> routes -> ourRefcount
 	peerRouteMap map[string]map[*graph.NetworkRoute]int
+	mapLock      *sync.RWMutex
 
 	Graph *graph.NetworkGraph
 }
@@ -16,11 +19,14 @@ type PeerGraphMap struct {
 func NewPeerGraphMap() *PeerGraphMap {
 	return &PeerGraphMap{
 		peerRouteMap: make(map[string]map[*graph.NetworkRoute]int),
+		mapLock:      &sync.RWMutex{},
 		Graph:        graph.Create(),
 	}
 }
 
 func (p *PeerGraphMap) addRoute(peer string, r *graph.NetworkRoute) {
+	p.mapLock.Lock()
+	defer p.mapLock.Unlock()
 	pmap, ok := p.peerRouteMap[peer]
 	if !ok {
 		pmap = make(map[*graph.NetworkRoute]int)
@@ -34,6 +40,8 @@ func (p *PeerGraphMap) addRoute(peer string, r *graph.NetworkRoute) {
 }
 
 func (p *PeerGraphMap) removeRoute(peer string, r *graph.NetworkRoute) {
+	p.mapLock.Lock()
+	defer p.mapLock.Unlock()
 	route, removed := p.Graph.DecrRoute(r.Hops())
 	p.peerRouteMap[peer][route]--
 
@@ -44,6 +52,8 @@ func (p *PeerGraphMap) removeRoute(peer string, r *graph.NetworkRoute) {
 
 // TODO: use
 func (p *PeerGraphMap) addPeer(peer string) {
+	p.mapLock.Lock()
+	defer p.mapLock.Unlock()
 	pmap, ok := p.peerRouteMap[peer]
 	if !ok {
 		pmap = make(map[*graph.NetworkRoute]int)
@@ -53,6 +63,8 @@ func (p *PeerGraphMap) addPeer(peer string) {
 
 // remove all routes associated with a peer
 func (p *PeerGraphMap) removePeer(peer string) {
+	p.mapLock.Lock()
+	defer p.mapLock.Unlock()
 	pmap, ok := p.peerRouteMap[peer]
 	if !ok {
 		logrus.Warningf("Attempting to remove a peer which isn't in the map: %v", peer)

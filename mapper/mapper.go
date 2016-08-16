@@ -162,7 +162,7 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 	for _, hop := range ret.Hops {
 		path = append(path, hop.AddressString())
 	}
-	logrus.Infof("traceroute path: %v", path)
+	logrus.Debugf("traceroute path: %v", path)
 
 	currRoute := m.RouteMap.GetRouteOption(m.localName, srcPort, p.Name, p.Port)
 

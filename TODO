@@ -31,6 +31,10 @@ General TODO:
     - events
         -- updates: node/link/route
     - IPv6 support (traceroute etc.)
+    - memberlist
+        -- use the meta field
+            - include "role"
+            - include http endpoint info (port at least)
 
 Metrics to figure out:
     - how many times a route flops over to a new one (route changes)
