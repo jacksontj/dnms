@@ -42,12 +42,19 @@ func main() {
 	m := mapper.NewMapper(cfg.AdvertiseAddr)
 	m.Start()
 
+	// TODO pass additional config
+	// Start HTTP API
+	api := NewHTTPApi(m)
+	api.Start()
+
 	// If we are an aggregator start that
 	var aggMap *aggregator.PeerGraphMap
 	if *aggNode {
 		aggMap = aggregator.NewPeerGraphMap()
 		api := aggregator.NewHTTPApi(aggMap)
 		api.Start()
+		// subscribe to ourself
+		aggregator.Subscribe(aggMap, "http://127.0.0.1:12345/v1/events/graph")
 	}
 
 	// Wire up the delegate-- he'll handle pings and node up/down events
@@ -75,11 +82,6 @@ func main() {
 		},
 	}
 	p.Start()
-
-	// TODO pass additional config
-	// Start HTTP API
-	api := NewHTTPApi(m)
-	api.Start()
 
 	// print state of the world for ease of debugging
 	for {
