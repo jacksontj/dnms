@@ -9,6 +9,7 @@ import (
 // This wraps graph.NetworkGraph to keep track of a given peer's refcounts on the
 // graph, so that when a peer goes away we can cleanup after it
 type PeerGraphMap struct {
+	Name      string
 	nodesMap  map[*graph.NetworkNode]int
 	nodesLock *sync.RWMutex
 
@@ -20,10 +21,13 @@ type PeerGraphMap struct {
 
 	// pointer to the graph for us to use
 	Graph *graph.NetworkGraph
+
+	subscriberExit chan bool
 }
 
-func NewPeerGraphMap(g *graph.NetworkGraph) *PeerGraphMap {
-	return &PeerGraphMap{
+func NewPeerGraphMap(name string, g *graph.NetworkGraph) *PeerGraphMap {
+	p := &PeerGraphMap{
+		Name:       name,
 		nodesMap:   make(map[*graph.NetworkNode]int),
 		nodesLock:  &sync.RWMutex{},
 		linksMap:   make(map[*graph.NetworkLink]int),
@@ -33,6 +37,13 @@ func NewPeerGraphMap(g *graph.NetworkGraph) *PeerGraphMap {
 
 		Graph: g,
 	}
+
+	// subscribe
+	c := Subscribe(p)
+
+	p.subscriberExit = c
+
+	return p
 }
 
 func (p *PeerGraphMap) AddNode(n *graph.NetworkNode) {
@@ -153,4 +164,5 @@ func (p *PeerGraphMap) cleanup() {
 		}
 	}
 	p.nodesLock.RUnlock()
+	p.subscriberExit <- false
 }

@@ -31,7 +31,7 @@ func (p *AggGraphMap) AddPeer(peer string) {
 	defer p.mapLock.Unlock()
 	_, ok := p.peerMap[peer]
 	if !ok {
-		p.peerMap[peer] = NewPeerGraphMap(p.Graph)
+		p.peerMap[peer] = NewPeerGraphMap(peer, p.Graph)
 	}
 }
 

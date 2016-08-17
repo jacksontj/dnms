@@ -11,18 +11,16 @@ import (
 // TODO: reconnect if the subsciber disconnects and we weren't asked to cancel
 // Subscripe to dest, consuming events into PeerGraphMap.
 // We'll return a bool channel which can be used to cancel the subscription
-func Subscribe(p *AggGraphMap, peer string) chan bool {
+func Subscribe(p *PeerGraphMap) chan bool {
 	exitChan := make(chan bool)
 	go func() {
-		stream, err := eventsource.Subscribe("http://"+peer+":12345/v1/events/graph", "")
+		stream, err := eventsource.Subscribe("http://"+p.Name+":12345/v1/events/graph", "")
 		if err != nil {
 			logrus.Fatalf("Error subscribing: %v", err)
 		}
-		p.AddPeer(peer)
 		// defer a removal in case the peer disconnects (or blips)
-		defer p.RemovePeer(peer)
+		defer p.cleanup()
 
-		peerMap := p.GetPeerMap(peer)
 		for {
 			select {
 			case ev := <-stream.Events:
@@ -32,7 +30,7 @@ func Subscribe(p *AggGraphMap, peer string) chan bool {
 				case "addNodeEvent":
 					n := graph.NetworkNode{}
 					json.Unmarshal([]byte(ev.Data()), &n)
-					peerMap.AddNode(&n)
+					p.AddNode(&n)
 				// TODO: update event
 				case "updateNodeEvent":
 					n := graph.NetworkNode{}
@@ -46,13 +44,13 @@ func Subscribe(p *AggGraphMap, peer string) chan bool {
 				case "removeNodeEvent":
 					n := graph.NetworkNode{}
 					json.Unmarshal([]byte(ev.Data()), &n)
-					peerMap.RemoveNode(&n)
+					p.RemoveNode(&n)
 
 				// Link events
 				case "addLinkEvent":
 					l := graph.NetworkLink{}
 					json.Unmarshal([]byte(ev.Data()), &l)
-					peerMap.AddLink(&l)
+					p.AddLink(&l)
 				// TODO: update event
 				case "updateLinkEvent":
 					// TODO: implement
@@ -60,13 +58,13 @@ func Subscribe(p *AggGraphMap, peer string) chan bool {
 				case "removeLinkEvent":
 					l := graph.NetworkLink{}
 					json.Unmarshal([]byte(ev.Data()), &l)
-					peerMap.RemoveLink(&l)
+					p.RemoveLink(&l)
 
 				// route events
 				case "addRouteEvent":
 					r := graph.NetworkRoute{}
 					json.Unmarshal([]byte(ev.Data()), &r)
-					peerMap.AddRoute(&r)
+					p.AddRoute(&r)
 				// TODO: update event
 				case "updateRouteEvent":
 					r := graph.NetworkRoute{}
@@ -78,7 +76,7 @@ func Subscribe(p *AggGraphMap, peer string) chan bool {
 				case "removeRouteEvent":
 					r := graph.NetworkRoute{}
 					json.Unmarshal([]byte(ev.Data()), &r)
-					peerMap.RemoveRoute(&r)
+					p.RemoveRoute(&r)
 
 				}
 			case <-exitChan:

@@ -55,7 +55,7 @@ func main() {
 		api.Start()
 		// TODO: through something better than http, it is local after all
 		// subscribe to ourself
-		aggregator.Subscribe(aggMap, "127.0.0.1")
+		aggMap.AddPeer("127.0.0.1")
 	}
 
 	// Wire up the delegate-- he'll handle pings and node up/down events
