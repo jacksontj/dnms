@@ -119,12 +119,13 @@ func (g *NetworkGraph) IncrNode(name string, newNode *NetworkNode) (*NetworkNode
 			n = NewNetworkNode(name, g.internalEvents)
 		} else {
 			n = newNode
+			n.updateChan = g.internalEvents
 		}
 		g.NodesMap[name] = n
 
-		// TODO: there is an obvious race here-- the NewNetworkNode() call spawns
-		// a gouroutine in the background-- we need to either hold the event (ordering problems)
-		// or send an update event after the fact
+		// Now that there is a new thing we fire an addEvent.
+		// Note: if the background DNS lookup was initiated an updateEvent
+		// will fire as soon as the lookup completes
 		g.internalEvents <- &Event{
 			E:    addEvent,
 			Item: n,
@@ -286,6 +287,7 @@ func (g *NetworkGraph) IncrRoute(hops []string, newRoute *NetworkRoute) (*Networ
 				newRoute.Path[i] = node
 			}
 			route = newRoute
+			route.updateChan = g.internalEvents
 		}
 		g.RoutesMap[key] = route
 
