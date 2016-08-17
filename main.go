@@ -53,6 +53,7 @@ func main() {
 		aggMap = aggregator.NewAggGraphMap()
 		api := aggregator.NewHTTPApi(aggMap)
 		api.Start()
+		// TODO: through something better than http, it is local after all
 		// subscribe to ourself
 		aggregator.Subscribe(aggMap, "127.0.0.1")
 	}
