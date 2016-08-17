@@ -38,8 +38,7 @@ func Subscribe(p *AggGraphMap, peer string) chan bool {
 					n := graph.NetworkNode{}
 					json.Unmarshal([]byte(ev.Data()), &n)
 					node := p.Graph.GetNode(n.Name)
-					// if the node is new-- its possible we get the updateEvent before
-					// the route has been added
+					// TODO: some sort of "merge" method
 					if node != nil {
 						// TODO: some sort of "merge" method
 						node.DNSNames = n.DNSNames
@@ -57,6 +56,7 @@ func Subscribe(p *AggGraphMap, peer string) chan bool {
 				// TODO: update event
 				case "updateLinkEvent":
 					// TODO: implement
+					// TODO: some sort of "merge" method
 				case "removeLinkEvent":
 					l := graph.NetworkLink{}
 					json.Unmarshal([]byte(ev.Data()), &l)

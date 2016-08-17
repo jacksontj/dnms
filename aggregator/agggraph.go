@@ -42,6 +42,7 @@ func (p *AggGraphMap) RemovePeer(peer string) {
 	pmap, ok := p.peerMap[peer]
 	if !ok {
 		logrus.Warningf("Attempting to remove a peer which isn't in the map: %v", peer)
+		return
 	}
 
 	pmap.cleanup()
