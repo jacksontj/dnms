@@ -27,8 +27,6 @@ General TODO:
     - Better UI
         -- separate views for graph vs routes etc.
         -- visualization for latency / loss / etc
-    - events
-        -- updates: node/link on the aggregator
     - IPv6 support (traceroute etc.)
     - memberlist
         -- use the meta field

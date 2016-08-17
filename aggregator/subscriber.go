@@ -8,6 +8,7 @@ import (
 	"github.com/jacksontj/eventsource"
 )
 
+// TODO: reconnect if the subsciber disconnects and we weren't asked to cancel
 // Subscripe to dest, consuming events into PeerGraphMap.
 // We'll return a bool channel which can be used to cancel the subscription
 func Subscribe(p *AggGraphMap, peer string) chan bool {
@@ -18,6 +19,7 @@ func Subscribe(p *AggGraphMap, peer string) chan bool {
 			logrus.Fatalf("Error subscribing: %v", err)
 		}
 		p.AddPeer(peer)
+		// defer a removal in case the peer disconnects (or blips)
 		defer p.RemovePeer(peer)
 
 		peerMap := p.GetPeerMap(peer)
