@@ -14,14 +14,14 @@ import (
 type NetworkGraph struct {
 	// nodeName -> Node
 	NodesMap  map[string]*NetworkNode `json:"nodes"`
-	NodesLock *sync.RWMutex
+	NodesLock *sync.RWMutex           `json:"-"`
 
 	// nodeName,nodeName -> NetworkLink
 	LinksMap  map[string]*NetworkLink `json:"edges"`
-	LinksLock *sync.RWMutex
+	LinksLock *sync.RWMutex           `json:"-"`
 
 	RoutesMap  map[string]*NetworkRoute `json:"routes"`
-	RoutesLock *sync.RWMutex
+	RoutesLock *sync.RWMutex            `json:"-"`
 
 	// event stuff
 	eventChannels     map[chan *Event]bool
