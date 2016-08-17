@@ -25,6 +25,24 @@
 </head>
 <body>
 <script>
+
+    // Return the value of a query parameter (or null)
+    function getQueryParam(param) {
+        ret = null
+        location.search.substr(1)
+            .split("&")
+            .some(function(item) { // returns first occurence and stops
+                return item.split("=")[0] == param && (ret = item.split("=")[1])
+            })
+
+        // If the return isn't null lets decode it
+        if (ret != null) {
+            return decodeURIComponent(ret)
+        } else {
+            return null
+        }
+    }
+
     var graph;
     function myGraph() {
 
@@ -209,7 +227,13 @@
 
     // initial load of the graph
     if (!!window.EventSource) {
-        var source = new EventSource('http://127.0.0.1:8888/v1/events/graph');
+        var srcHost = getQueryParam('source');
+        var source;
+        if (srcHost != null) {
+            source = new EventSource('http://' + srcHost + '/v1/events/graph');
+        } else {
+            source = new EventSource('http://127.0.0.1:8888/v1/events/graph');
+        }
 
         // All the event listeners
         source.addEventListener('addNodeEvent', function(e) {
