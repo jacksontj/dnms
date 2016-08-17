@@ -259,6 +259,7 @@ func (g *NetworkGraph) IncrRoute(hops []string) (*NetworkRoute, bool) {
 			State:      Up,
 			metricRing: ring.New(10), // TODO: config
 			mLock:      &sync.RWMutex{},
+			updateChan: g.internalEvents,
 		}
 		g.RoutesMap[key] = route
 

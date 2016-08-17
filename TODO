@@ -12,7 +12,6 @@ Parts TODO:
         think are having issues
     - aggregation
         -- route around nodes that can't talk to aggregation nodes
-        -- summarize metrics -- since we won't do our own pinging
 
 General TODO:
     - Metrics
@@ -29,7 +28,7 @@ General TODO:
         -- separate views for graph vs routes etc.
         -- visualization for latency / loss / etc
     - events
-        -- updates: node/link/route
+        -- updates: node/link
     - IPv6 support (traceroute etc.)
     - memberlist
         -- use the meta field

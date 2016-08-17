@@ -28,12 +28,15 @@ type NetworkRoute struct {
 
 	// Network statistics
 	State graphState `json:"state"` // TODO: better handle in the serialization
-	// TODO: race condition around this-- either lock it up, or goroutine it
+
 	metricRing *ring.Ring
 	mLock      *sync.RWMutex
 
 	// how many are refrencing it
 	refCount int
+
+	// Channel to send update event on
+	updateChan chan *Event
 }
 
 func (r *NetworkRoute) Key() string {
@@ -55,6 +58,7 @@ func (r *NetworkRoute) HandleACK(pass bool, latency int64) {
 
 	// TODO: change to percentage thresholds
 	// update state
+	origState := r.State
 	if pass == true { // Going up
 		switch r.State {
 		case Suspect:
@@ -71,6 +75,13 @@ func (r *NetworkRoute) HandleACK(pass bool, latency int64) {
 		}
 	}
 
+	// TODO: also send updates when metrics change sufficiently?
+	if origState != r.State {
+		r.updateChan <- &Event{
+			E:    updateEvent,
+			Item: r,
+		}
+	}
 }
 
 func (r *NetworkRoute) SamePath(path []string) bool {

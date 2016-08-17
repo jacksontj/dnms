@@ -26,10 +26,30 @@ func Subscribe(p *PeerGraphMap, peer string) chan bool {
 					r := graph.NetworkRoute{}
 					json.Unmarshal([]byte(ev.Data()), &r)
 					p.addRoute(peer, &r)
+				case "updateRouteEvent":
+					r := graph.NetworkRoute{}
+					json.Unmarshal([]byte(ev.Data()), &r)
+					route := p.Graph.GetRoute(r.Hops())
+
+					// TODO: some sort of "merge" method
+					route.State = r.State
 				case "removeRouteEvent":
 					r := graph.NetworkRoute{}
 					json.Unmarshal([]byte(ev.Data()), &r)
 					p.removeRoute(peer, &r)
+
+					/*
+						case "updateNodeEvent":
+							n := graph.NetworkNode{}
+							json.Unmarshal([]byte(ev.Data()), &n)
+							node := p.Graph.GetNode(n.Name)
+							// if the node is new-- its possible we get the updateEvent before
+							// the route has been added
+							if node != nil {
+								// TODO: some sort of "merge" method
+								node.DNSNames = n.DNSNames
+							}
+					*/
 				}
 			case <-exitChan:
 				return
