@@ -21,12 +21,15 @@ type NetworkNode struct {
 	nLock    *sync.RWMutex
 
 	refCount int
+
+	updateChan chan *Event
 }
 
-func NewNetworkNode(name string) *NetworkNode {
+func NewNetworkNode(name string, updateChan chan *Event) *NetworkNode {
 	r := &NetworkNode{
-		Name:  name,
-		nLock: &sync.RWMutex{},
+		Name:       name,
+		nLock:      &sync.RWMutex{},
+		updateChan: updateChan,
 	}
 
 	// background load DNS names
@@ -38,6 +41,10 @@ func NewNetworkNode(name string) *NetworkNode {
 			n.nLock.Lock()
 			n.DNSNames = names
 			n.nLock.Unlock()
+		}
+		n.updateChan <- &Event{
+			E:    updateEvent,
+			Item: n,
 		}
 	}(r)
 

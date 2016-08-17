@@ -3,76 +3,154 @@ package aggregator
 import (
 	"sync"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/jacksontj/dnms/graph"
 )
 
-// TODO: use routemap
+// This wraps graph.NetworkGraph to keep track of a given peer's refcounts on the
+// graph, so that when a peer goes away we can cleanup after it
 type PeerGraphMap struct {
-	// map of peer -> routes -> ourRefcount
-	peerRouteMap map[string]map[*graph.NetworkRoute]int
-	mapLock      *sync.RWMutex
+	nodesMap  map[*graph.NetworkNode]int
+	nodesLock *sync.RWMutex
 
+	linksMap  map[*graph.NetworkLink]int
+	linksLock *sync.RWMutex
+
+	routesMap  map[*graph.NetworkRoute]int
+	routesLock *sync.RWMutex
+
+	// pointer to the graph for us to use
 	Graph *graph.NetworkGraph
 }
 
-func NewPeerGraphMap() *PeerGraphMap {
+func NewPeerGraphMap(g *graph.NetworkGraph) *PeerGraphMap {
 	return &PeerGraphMap{
-		peerRouteMap: make(map[string]map[*graph.NetworkRoute]int),
-		mapLock:      &sync.RWMutex{},
-		Graph:        graph.Create(),
+		nodesMap:   make(map[*graph.NetworkNode]int),
+		nodesLock:  &sync.RWMutex{},
+		linksMap:   make(map[*graph.NetworkLink]int),
+		linksLock:  &sync.RWMutex{},
+		routesMap:  make(map[*graph.NetworkRoute]int),
+		routesLock: &sync.RWMutex{},
+
+		Graph: g,
 	}
 }
 
-func (p *PeerGraphMap) addRoute(peer string, r *graph.NetworkRoute) {
-	p.mapLock.Lock()
-	defer p.mapLock.Unlock()
-	pmap, ok := p.peerRouteMap[peer]
-	if !ok {
-		pmap = make(map[*graph.NetworkRoute]int)
-		p.peerRouteMap[peer] = pmap
+func (p *PeerGraphMap) AddNode(n *graph.NetworkNode) {
+	p.nodesLock.Lock()
+	defer p.nodesLock.Unlock()
+	p.addNode(n)
+}
+
+func (p *PeerGraphMap) addNode(n *graph.NetworkNode) {
+	node, added := p.Graph.IncrNode(n.Name)
+	if added {
+		p.nodesMap[node] = 0
 	}
+	p.nodesMap[node]++
+}
+
+func (p *PeerGraphMap) RemoveNode(n *graph.NetworkNode) {
+	p.nodesLock.Lock()
+	defer p.nodesLock.Unlock()
+	p.removeNode(n)
+}
+
+func (p *PeerGraphMap) removeNode(n *graph.NetworkNode) {
+	node, removed := p.Graph.DecrNode(n.Name)
+	p.nodesMap[node]--
+
+	// TODO: check that the refcount was 0
+	if removed {
+		delete(p.nodesMap, node)
+	}
+}
+
+func (p *PeerGraphMap) AddLink(l *graph.NetworkLink) {
+	p.linksLock.Lock()
+	defer p.linksLock.Unlock()
+	p.addLink(l)
+}
+
+func (p *PeerGraphMap) addLink(l *graph.NetworkLink) {
+	link, added := p.Graph.IncrLink(l.Src.Name, l.Dst.Name)
+	if added {
+		p.linksMap[link] = 0
+	}
+	p.linksMap[link]++
+}
+
+func (p *PeerGraphMap) RemoveLink(l *graph.NetworkLink) {
+	p.linksLock.Lock()
+	defer p.linksLock.Unlock()
+	p.removeLink(l)
+}
+
+func (p *PeerGraphMap) removeLink(l *graph.NetworkLink) {
+	link, removed := p.Graph.DecrLink(l.Src.Name, l.Dst.Name)
+	p.linksMap[link]--
+
+	// TODO: check that the refcount was 0
+	if removed {
+		delete(p.linksMap, link)
+	}
+}
+
+func (p *PeerGraphMap) AddRoute(r *graph.NetworkRoute) {
+	p.routesLock.Lock()
+	defer p.routesLock.Unlock()
+	p.addRoute(r)
+}
+
+func (p *PeerGraphMap) addRoute(r *graph.NetworkRoute) {
 	route, added := p.Graph.IncrRoute(r.Hops())
 	if added {
-		p.peerRouteMap[peer][route] = 0
+		p.routesMap[route] = 0
 	}
-	p.peerRouteMap[peer][route]++
+	p.routesMap[route]++
 }
 
-func (p *PeerGraphMap) removeRoute(peer string, r *graph.NetworkRoute) {
-	p.mapLock.Lock()
-	defer p.mapLock.Unlock()
+func (p *PeerGraphMap) RemoveRoute(r *graph.NetworkRoute) {
+	p.routesLock.Lock()
+	defer p.routesLock.Unlock()
+	p.removeRoute(r)
+}
+
+func (p *PeerGraphMap) removeRoute(r *graph.NetworkRoute) {
 	route, removed := p.Graph.DecrRoute(r.Hops())
-	p.peerRouteMap[peer][route]--
+	p.routesMap[route]--
 
+	// TODO: check that the refcount was 0
 	if removed {
-		delete(p.peerRouteMap[peer], route)
+		delete(p.routesMap, route)
 	}
 }
 
-func (p *PeerGraphMap) AddPeer(peer string) {
-	p.mapLock.Lock()
-	defer p.mapLock.Unlock()
-	pmap, ok := p.peerRouteMap[peer]
-	if !ok {
-		pmap = make(map[*graph.NetworkRoute]int)
-		p.peerRouteMap[peer] = pmap
-	}
-}
-
-// remove all routes associated with a peer
-func (p *PeerGraphMap) RemovePeer(peer string) {
-	p.mapLock.Lock()
-	defer p.mapLock.Unlock()
-	pmap, ok := p.peerRouteMap[peer]
-	if !ok {
-		logrus.Warningf("Attempting to remove a peer which isn't in the map: %v", peer)
-	}
-
-	for route, count := range pmap {
+// remove all routes associated with this peer
+func (p *PeerGraphMap) cleanup() {
+	// remove all routes
+	p.routesLock.RLock()
+	for route, count := range p.routesMap {
 		for x := 0; x < count; x++ {
-			p.Graph.DecrRoute(route.Hops())
+			p.removeRoute(route)
 		}
 	}
-	delete(p.peerRouteMap, peer)
+	p.routesLock.RUnlock()
+
+	// remove all links
+	p.linksLock.RLock()
+	for link, count := range p.linksMap {
+		for x := 0; x < count; x++ {
+			p.removeLink(link)
+		}
+	}
+	p.linksLock.RUnlock()
+
+	// remove all nodes
+	p.nodesLock.RLock()
+	for node, count := range p.nodesMap {
+		for x := 0; x < count; x++ {
+			p.removeNode(node)
+		}
+	}
+	p.nodesLock.RUnlock()
 }

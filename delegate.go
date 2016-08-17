@@ -14,7 +14,7 @@ type DNMSDelegate struct {
 	Mapper *mapper.Mapper
 
 	// for aggregation
-	AggMap *aggregator.PeerGraphMap
+	AggMap *aggregator.AggGraphMap
 	// TODO: move peerSubs into the PeerGraphMap ?
 	// TODO: locking?
 	peerSubs map[*memberlist.Node]chan bool
@@ -22,7 +22,7 @@ type DNMSDelegate struct {
 	Mlist *memberlist.Memberlist
 }
 
-func NewDNMSDelegate(m *mapper.Mapper, a *aggregator.PeerGraphMap) *DNMSDelegate {
+func NewDNMSDelegate(m *mapper.Mapper, a *aggregator.AggGraphMap) *DNMSDelegate {
 	return &DNMSDelegate{
 		Mapper:   m,
 		AggMap:   a,

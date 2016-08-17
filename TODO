@@ -29,6 +29,7 @@ General TODO:
         -- visualization for latency / loss / etc
     - events
         -- updates: node/link
+    - IncrNode/IncrLink/IncrRoute should be able to pass in an existing object (at least for aggregation)
     - IPv6 support (traceroute etc.)
     - memberlist
         -- use the meta field

@@ -12,12 +12,12 @@ import (
 )
 
 type HTTPApi struct {
-	p *PeerGraphMap
+	p *AggGraphMap
 
 	eventBroker *eventsource.Server
 }
 
-func NewHTTPApi(p *PeerGraphMap) *HTTPApi {
+func NewHTTPApi(p *AggGraphMap) *HTTPApi {
 	api := &HTTPApi{
 		p:           p,
 		eventBroker: eventsource.NewServer(),

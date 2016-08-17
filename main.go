@@ -48,9 +48,9 @@ func main() {
 	api.Start()
 
 	// If we are an aggregator start that
-	var aggMap *aggregator.PeerGraphMap
+	var aggMap *aggregator.AggGraphMap
 	if *aggNode {
-		aggMap = aggregator.NewPeerGraphMap()
+		aggMap = aggregator.NewAggGraphMap()
 		api := aggregator.NewHTTPApi(aggMap)
 		api.Start()
 		// subscribe to ourself

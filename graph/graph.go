@@ -115,7 +115,7 @@ func (g *NetworkGraph) IncrNode(name string) (*NetworkNode, bool) {
 	n, ok := g.NodesMap[name]
 	// if this one doesn't exist, lets add it
 	if !ok {
-		n = NewNetworkNode(name)
+		n = NewNetworkNode(name, g.internalEvents)
 		g.NodesMap[name] = n
 
 		// TODO: there is an obvious race here-- the NewNetworkNode() call spawns
@@ -143,14 +143,14 @@ func (g *NetworkGraph) GetNodeCount() int {
 	return len(g.NodesMap)
 }
 
-func (g *NetworkGraph) DecrNode(name string) bool {
+func (g *NetworkGraph) DecrNode(name string) (*NetworkNode, bool) {
 	g.NodesLock.Lock()
 	defer g.NodesLock.Unlock()
 	n, ok := g.NodesMap[name]
 
 	if !ok {
 		logrus.Warningf("Attempted to remove node with ip %v which wasn't in the graph", name)
-		return false
+		return nil, false
 	}
 
 	n.refCount--
@@ -160,9 +160,9 @@ func (g *NetworkGraph) DecrNode(name string) bool {
 			E:    removeEvent,
 			Item: n,
 		}
-		return true
+		return n, true
 	}
-	return false
+	return nil, false
 }
 
 func (g *NetworkGraph) IncrLink(src, dst string) (*NetworkLink, bool) {
@@ -201,14 +201,14 @@ func (g *NetworkGraph) GetLinkCount() int {
 	return len(g.LinksMap)
 }
 
-func (g *NetworkGraph) DecrLink(src, dst string) bool {
+func (g *NetworkGraph) DecrLink(src, dst string) (*NetworkLink, bool) {
 	key := src + "," + dst
 	g.LinksLock.Lock()
 	defer g.LinksLock.Unlock()
 	l, ok := g.LinksMap[key]
 	if !ok {
 		logrus.Warningf("Attempted to remove link %v which wasn't in the graph", key)
-		return false
+		return nil, false
 	}
 	// decrement ourselves
 	l.refCount--
@@ -221,9 +221,9 @@ func (g *NetworkGraph) DecrLink(src, dst string) bool {
 			E:    removeEvent,
 			Item: l,
 		}
-		return true
+		return l, true
 	}
-	return false
+	return nil, false
 }
 
 func (g *NetworkGraph) pathKey(hops []string) string {
