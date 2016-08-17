@@ -170,3 +170,19 @@ func (r *NetworkRoute) MarshalJSON() ([]byte, error) {
 		Alias:   (*Alias)(r),
 	})
 }
+
+// Fancy unmashal method
+func (r *NetworkRoute) UnmarshalJSON(data []byte) error {
+	type Alias NetworkRoute
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(r),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	r.metricRing = ring.New(100) // TODO: config
+	r.mLock = &sync.RWMutex{}
+	return nil
+}

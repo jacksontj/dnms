@@ -42,7 +42,7 @@ func (p *PeerGraphMap) AddNode(n *graph.NetworkNode) {
 }
 
 func (p *PeerGraphMap) addNode(n *graph.NetworkNode) {
-	node, added := p.Graph.IncrNode(n.Name)
+	node, added := p.Graph.IncrNode(n.Name, n)
 	if added {
 		p.nodesMap[node] = 0
 	}
@@ -72,7 +72,7 @@ func (p *PeerGraphMap) AddLink(l *graph.NetworkLink) {
 }
 
 func (p *PeerGraphMap) addLink(l *graph.NetworkLink) {
-	link, added := p.Graph.IncrLink(l.Src.Name, l.Dst.Name)
+	link, added := p.Graph.IncrLink(l.Src.Name, l.Dst.Name, l)
 	if added {
 		p.linksMap[link] = 0
 	}
@@ -102,7 +102,7 @@ func (p *PeerGraphMap) AddRoute(r *graph.NetworkRoute) {
 }
 
 func (p *PeerGraphMap) addRoute(r *graph.NetworkRoute) {
-	route, added := p.Graph.IncrRoute(r.Hops())
+	route, added := p.Graph.IncrRoute(r.Hops(), r)
 	if added {
 		p.routesMap[route] = 0
 	}

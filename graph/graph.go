@@ -109,13 +109,17 @@ func (g *NetworkGraph) Subscribe(c chan *Event) {
 	g.eventRegistration <- c
 }
 
-func (g *NetworkGraph) IncrNode(name string) (*NetworkNode, bool) {
+func (g *NetworkGraph) IncrNode(name string, newNode *NetworkNode) (*NetworkNode, bool) {
 	g.NodesLock.Lock()
 	defer g.NodesLock.Unlock()
 	n, ok := g.NodesMap[name]
 	// if this one doesn't exist, lets add it
 	if !ok {
-		n = NewNetworkNode(name, g.internalEvents)
+		if newNode == nil {
+			n = NewNetworkNode(name, g.internalEvents)
+		} else {
+			n = newNode
+		}
 		g.NodesMap[name] = n
 
 		// TODO: there is an obvious race here-- the NewNetworkNode() call spawns
@@ -165,17 +169,26 @@ func (g *NetworkGraph) DecrNode(name string) (*NetworkNode, bool) {
 	return nil, false
 }
 
-func (g *NetworkGraph) IncrLink(src, dst string) (*NetworkLink, bool) {
+func (g *NetworkGraph) IncrLink(src, dst string, newLink *NetworkLink) (*NetworkLink, bool) {
 	key := src + "," + dst
 	g.LinksLock.Lock()
 	defer g.LinksLock.Unlock()
 	l, ok := g.LinksMap[key]
 	if !ok {
-		srcNode, _ := g.IncrNode(src)
-		dstNode, _ := g.IncrNode(dst)
-		l = &NetworkLink{
-			Src: srcNode,
-			Dst: dstNode,
+		if newLink == nil {
+			srcNode, _ := g.IncrNode(src, nil)
+			dstNode, _ := g.IncrNode(dst, nil)
+			l = &NetworkLink{
+				Src: srcNode,
+				Dst: dstNode,
+			}
+		} else {
+			srcNode, _ := g.IncrNode(src, newLink.Src)
+			dstNode, _ := g.IncrNode(dst, newLink.Dst)
+			// update child pointers
+			newLink.Src = srcNode
+			newLink.Dst = dstNode
+			l = newLink
 		}
 		g.LinksMap[key] = l
 		g.internalEvents <- &Event{
@@ -234,7 +247,7 @@ func (g *NetworkGraph) pathKey(hops []string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func (g *NetworkGraph) IncrRoute(hops []string) (*NetworkRoute, bool) {
+func (g *NetworkGraph) IncrRoute(hops []string, newRoute *NetworkRoute) (*NetworkRoute, bool) {
 	key := g.pathKey(hops)
 
 	g.RoutesLock.Lock()
@@ -245,21 +258,34 @@ func (g *NetworkGraph) IncrRoute(hops []string) (*NetworkRoute, bool) {
 	// if we don't have it, lets make it
 	if !ok {
 		logrus.Debugf("New Route: key=%s %v", key, hops)
-		path := make([]*NetworkNode, 0, len(hops))
-		for i, hop := range hops {
-			hopNode, _ := g.IncrNode(hop)
-			path = append(path, hopNode)
-			// If there was something prior-- lets add the link as well
-			if i-1 >= 0 {
-				g.IncrLink(hops[i-1], hop)
+		if newRoute == nil {
+			path := make([]*NetworkNode, 0, len(hops))
+			for i, hop := range hops {
+				hopNode, _ := g.IncrNode(hop, nil)
+				path = append(path, hopNode)
+				// If there was something prior-- lets add the link as well
+				if i-1 >= 0 {
+					g.IncrLink(hops[i-1], hop, nil)
+				}
 			}
-		}
-		route = &NetworkRoute{
-			Path:       path,
-			State:      Up,
-			metricRing: ring.New(100), // TODO: config
-			mLock:      &sync.RWMutex{},
-			updateChan: g.internalEvents,
+			route = &NetworkRoute{
+				Path:       path,
+				State:      Up,
+				metricRing: ring.New(100), // TODO: config
+				mLock:      &sync.RWMutex{},
+				updateChan: g.internalEvents,
+			}
+		} else {
+			for i, node := range newRoute.Path {
+				node, _ := g.IncrNode(node.Name, node)
+				// If there was something prior-- lets add the link as well
+				if i-1 >= 0 {
+					g.IncrLink(newRoute.Path[i-1].Name, node.Name, nil)
+				}
+				// re-set the node in the path, in case its not the same pointer
+				newRoute.Path[i] = node
+			}
+			route = newRoute
 		}
 		g.RoutesMap[key] = route
 

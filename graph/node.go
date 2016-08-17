@@ -63,3 +63,18 @@ func (n *NetworkNode) MarshalJSON() ([]byte, error) {
 		Alias: (*Alias)(n),
 	})
 }
+
+// Fancy unmashal method
+func (n *NetworkNode) UnmarshalJSON(data []byte) error {
+	type Alias NetworkNode
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	n.nLock = &sync.RWMutex{}
+	return nil
+}
