@@ -41,10 +41,12 @@ func NewNetworkNode(name string, updateChan chan *Event) *NetworkNode {
 			n.nLock.Lock()
 			n.DNSNames = names
 			n.nLock.Unlock()
-		}
-		n.updateChan <- &Event{
-			E:    updateEvent,
-			Item: n,
+
+			// Update event if the resolution completes
+			n.updateChan <- &Event{
+				E:    updateEvent,
+				Item: n,
+			}
 		}
 	}(r)
 
