@@ -26,8 +26,6 @@ func Subscribe(p *AggGraphMap, peer string) chan bool {
 		for {
 			select {
 			case ev := <-stream.Events:
-				// TODO: actually add/remove this correctly
-				// TODO: care about more events
 				switch ev.Event() {
 
 				// Node events
