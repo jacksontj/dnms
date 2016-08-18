@@ -26,3 +26,14 @@ Traceroute Group: a group of traceroutes against a specific destination
 Any given node will know about the peers in the network. It will intermittently
 ping and traceroute peers in the network, and keep track of failures. In the
 event of a failure we'll determine what links are at fault for the disruption.
+
+
+## Implementation
+
+The goal here is to create a few layers that in themselves create something useful
+
+Base parts:
+* Memberlist: our peers on the network to talk to
+* Mapper: responsible for mapping the network based on who is in the memberlist
+* Pinger: ping all peers in the network-- specifically to hit all routes in the mapper
+* Aggregator: aggregate all the graph info from the members of the memberlist

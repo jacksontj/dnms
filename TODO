@@ -1,12 +1,3 @@
-Implementation
-
-The goal here is to create a few layers that in themselves create something useful
-
-Base parts:
-    - Memberlist: our peers on the network to talk to
-    - Mapper: responsible for mapping the network based on who is in the memberlist
-    - Pinger: ping all peers in the network-- specifically to hit all routes in the mapper
-
 TODO:
     - fault detection: using events from pinger/mapper correlate which links we
         think are having issues
