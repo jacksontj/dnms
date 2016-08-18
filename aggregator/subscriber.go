@@ -31,7 +31,6 @@ func Subscribe(p *PeerGraphMap) chan bool {
 					n := graph.NetworkNode{}
 					json.Unmarshal([]byte(ev.Data()), &n)
 					p.AddNode(&n)
-				// TODO: update event
 				case "updateNodeEvent":
 					n := graph.NetworkNode{}
 					json.Unmarshal([]byte(ev.Data()), &n)
@@ -65,7 +64,6 @@ func Subscribe(p *PeerGraphMap) chan bool {
 					r := graph.NetworkRoute{}
 					json.Unmarshal([]byte(ev.Data()), &r)
 					p.AddRoute(&r)
-				// TODO: update event
 				case "updateRouteEvent":
 					r := graph.NetworkRoute{}
 					json.Unmarshal([]byte(ev.Data()), &r)
