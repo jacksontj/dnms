@@ -7,23 +7,23 @@ Base parts:
     - Mapper: responsible for mapping the network based on who is in the memberlist
     - Pinger: ping all peers in the network-- specifically to hit all routes in the mapper
 
-Parts TODO:
+TODO:
     - fault detection: using events from pinger/mapper correlate which links we
         think are having issues
     - aggregation
+        -- switch from pull to push
         -- route around nodes that can't talk to aggregation nodes
         -- auto-sharding (probably based on peername)
+    - IPv6 support (traceroute etc.)
+    - memberlist: use the meta field
+        -- include "role"
+        -- include http endpoint info (port at least)?
 
-General TODO:
+In the future:
+    - support TCP pings
     - Better UI
         -- separate views for graph vs routes etc.
         -- visualization for latency / loss / etc
-    - IPv6 support (traceroute etc.)
-    - memberlist
-        -- use the meta field
-            - include "role"
-            - include http endpoint info (port at least)
-    - switch aggregation from pull to push
 
 Metrics to figure out:
     - how many times a route flops over to a new one (route changes)
