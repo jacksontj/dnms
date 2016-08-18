@@ -13,44 +13,43 @@ import (
 
 // Return the first non-loopback address as a 4 byte IP address. This address
 // is used for sending packets out.
-func socketAddr() (addr [4]byte, err error) {
+func getLocalIP() (net.IP, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	for _, a := range addrs {
-		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if len(ipnet.IP.To4()) == net.IPv4len {
-				copy(addr[:], ipnet.IP.To4())
-				return
-			}
+	for _, address := range addrs {
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			return ipnet.IP, nil
 		}
 	}
-	err = errors.New("You do not appear to be connected to the Internet")
-	return
+	return nil, errors.New("You do not appear to be connected to the Internet")
 }
 
 // Given a host name convert it to a 4 byte IP address.
-func destAddr(dest string) (destAddr [4]byte, err error) {
-	addrs, err := net.LookupHost(dest)
+func destAddr(dest string) (net.IP, error) {
+	ips, err := net.LookupIP(dest)
 	if err != nil {
-		return
+		return nil, err
 	}
-	addr := addrs[0]
+	ip := ips[0]
+	return ip, nil
 
-	ipAddr, err := net.ResolveIPAddr("ip", addr)
-	if err != nil {
+	/*
+		ipAddr, err := net.ResolveIPAddr("ip", addr)
+		if err != nil {
+			return
+		}
+		copy(destAddr[:], ipAddr.IP.To4())
 		return
-	}
-	copy(destAddr[:], ipAddr.IP.To4())
-	return
+	*/
 }
 
 // TracerouteHop type
 type TracerouteHop struct {
 	Success     bool
-	Address     [4]byte
+	Address     net.IP
 	N           int
 	ElapsedTime time.Duration
 	TTL         int
@@ -62,7 +61,7 @@ func (hop *TracerouteHop) AddressString() string {
 
 // TracerouteResult type
 type TracerouteResult struct {
-	DestinationAddress [4]byte
+	DestinationAddress net.IP
 	Hops               []TracerouteHop
 }
 
@@ -78,6 +77,25 @@ func closeNotify(channels []chan TracerouteHop) {
 	}
 }
 
+func ipToSockaddr(ip net.IP, port int) syscall.Sockaddr {
+	if ip4 := ip.To4(); ip4 != nil {
+		var ip [4]byte
+		copy(ip[:], ip4)
+		return &syscall.SockaddrInet4{
+			Port: port,
+			Addr: ip,
+		}
+	} else if ip6 := ip.To16(); ip6 != nil {
+		var ip [16]byte
+		copy(ip[:], ip6)
+		return &syscall.SockaddrInet6{
+			Port: port,
+			Addr: ip,
+		}
+	}
+	return nil
+}
+
 // Traceroute uses the given dest (hostname) and options to execute a traceroute
 // from your machine to the remote host.
 //
@@ -87,12 +105,16 @@ func closeNotify(channels []chan TracerouteHop) {
 // the elapsed time and its IP address.
 func Traceroute(dest string, options *TracerouteOptions, c ...chan TracerouteHop) (result TracerouteResult, err error) {
 	result.Hops = []TracerouteHop{}
-	destAddr, err := destAddr(dest)
-	result.DestinationAddress = destAddr
-	socketAddr, err := socketAddr()
+	destIP, err := destAddr(dest)
+	result.DestinationAddress = destIP
+	sourceIP, err := getLocalIP()
 	if err != nil {
 		return
 	}
+
+	// Convert the net.IPs to the appropriate sockaddrs
+	destSockaddr := ipToSockaddr(destIP, options.DstPort())
+	sourceSockaddr := ipToSockaddr(sourceIP, options.SrcPort())
 
 	timeoutMs := (int64)(options.TimeoutMs())
 	tv := syscall.NsecToTimeval(1000 * 1000 * timeoutMs)
@@ -128,7 +150,7 @@ func Traceroute(dest string, options *TracerouteOptions, c ...chan TracerouteHop
 		if options.SrcPort() > 0 {
 			// if srcPort is set, bind to that as well
 			syscall.SetsockoptInt(sendSocket, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
-			err = syscall.Bind(sendSocket, &syscall.SockaddrInet4{Port: options.SrcPort(), Addr: socketAddr})
+			err = syscall.Bind(sendSocket, sourceSockaddr)
 			// TODO: non-fatal error
 			if err != nil {
 				return result, err
@@ -136,17 +158,23 @@ func Traceroute(dest string, options *TracerouteOptions, c ...chan TracerouteHop
 		}
 
 		// Send a single null byte UDP packet
-		syscall.Sendto(sendSocket, []byte{0x0}, 0, &syscall.SockaddrInet4{Port: options.DstPort(), Addr: destAddr})
+		syscall.Sendto(sendSocket, []byte{0x0}, 0, destSockaddr)
 
 		var p = make([]byte, options.PacketSize())
 		n, from, err := syscall.Recvfrom(recvSocket, p, 0)
 		elapsed := time.Since(start)
 		if err == nil {
-			currAddr := from.(*syscall.SockaddrInet4).Addr
+			var currIP net.IP
+			switch t := from.(type) {
+			case *syscall.SockaddrInet4:
+				currIP = net.IP(t.Addr[:])
+			case *syscall.SockaddrInet6:
+				currIP = net.IP(t.Addr[:])
+			}
 
 			hop := TracerouteHop{
 				Success:     true,
-				Address:     currAddr,
+				Address:     currIP,
 				N:           n,
 				ElapsedTime: elapsed,
 				TTL:         ttl,
@@ -159,7 +187,7 @@ func Traceroute(dest string, options *TracerouteOptions, c ...chan TracerouteHop
 			ttl += 1
 			retry = 0
 
-			if ttl > options.MaxHops() || currAddr == destAddr {
+			if ttl > options.MaxHops() || currIP.Equal(destIP) {
 				closeNotify(c)
 				return result, nil
 			}

@@ -5,7 +5,6 @@ TODO:
         -- switch from pull to push
         -- route around nodes that can't talk to aggregation nodes
         -- auto-sharding (probably based on peername)
-    - IPv6 support (traceroute etc.)
     - memberlist: use the meta field
         -- include "role"
         -- include http endpoint info (port at least)?
