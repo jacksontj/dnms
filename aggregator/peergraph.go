@@ -3,6 +3,7 @@ package aggregator
 import (
 	"sync"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/jacksontj/dnms/graph"
 )
 
@@ -70,7 +71,10 @@ func (p *PeerGraphMap) removeNode(n *graph.NetworkNode) {
 	node, removed := p.Graph.DecrNode(n.Name)
 	p.nodesMap[node]--
 
-	// TODO: check that the refcount was 0
+	if removed && p.nodesMap[node] != 0 {
+		logrus.Warningf("link removed from graph, even when we have %d refcounts to it!", p.nodesMap[node])
+	}
+
 	if removed {
 		delete(p.nodesMap, node)
 	}
@@ -100,7 +104,10 @@ func (p *PeerGraphMap) removeLink(l *graph.NetworkLink) {
 	link, removed := p.Graph.DecrLink(l.Src.Name, l.Dst.Name)
 	p.linksMap[link]--
 
-	// TODO: check that the refcount was 0
+	if removed && p.linksMap[link] != 0 {
+		logrus.Warningf("link removed from graph, even when we have %d refcounts to it!", p.linksMap[link])
+	}
+
 	if removed {
 		delete(p.linksMap, link)
 	}
@@ -130,10 +137,14 @@ func (p *PeerGraphMap) removeRoute(r *graph.NetworkRoute) {
 	route, removed := p.Graph.DecrRoute(r.Hops())
 	p.routesMap[route]--
 
-	// TODO: check that the refcount was 0
+	if removed && p.routesMap[route] != 0 {
+		logrus.Warningf("route removed from graph, even when we have %d refcounts to it!", p.routesMap[route])
+	}
+
 	if removed {
 		delete(p.routesMap, route)
 	}
+
 }
 
 // remove all routes associated with this peer

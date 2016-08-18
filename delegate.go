@@ -50,18 +50,11 @@ func (d *DNMSDelegate) NotifyMsg(buf []byte) {
 			logrus.Warning("Unable to decode message: %v", err)
 			return
 		}
-		//logrus.Infof("Got a ping on %v", p)
-
-		// TODO: send the ack back the same way it came (if possible??)
-		// from some limited testing this seems VERY unreliable-- we should either
-		// just send it back however or from a specific port
-		//routeKey, ok := d.RouteMap.FindRoute(p.Path)
-		//logrus.Infof("Reverse route? routeKey=%s ok=%v", routeKey, ok)
 
 		a := ack{
 			PingTimeNS: p.PingTimeNS,
 		}
-		// TODO: major cleanup to encapsulate all this message sending
+
 		// Encode as a user message
 		encodedBuf, err := encode(ackMsg, a)
 		if err != nil {

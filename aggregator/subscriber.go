@@ -37,7 +37,6 @@ func Subscribe(p *PeerGraphMap) chan bool {
 					node := p.Graph.GetNode(n.Name)
 					// TODO: some sort of "merge" method
 					if node != nil {
-						// TODO: some sort of "merge" method
 						node.DNSNames = n.DNSNames
 					}
 				case "removeNodeEvent":

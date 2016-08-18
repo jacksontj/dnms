@@ -79,7 +79,6 @@ func (h *HTTPApi) setCommonHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 }
 
-// TODO: put marshal method on Graph
 func (h *HTTPApi) showGraph(w http.ResponseWriter, r *http.Request) {
 	ret, err := json.Marshal(h.m.Graph)
 	if err != nil {
@@ -145,9 +144,6 @@ func (h *HTTPApi) showRouteMap(w http.ResponseWriter, r *http.Request) {
 }
 
 // TODO: have an event stream per API endpoint?
-// TODO: start with a dump of everything-- then all updates since then (to avoid races)
-// TODO: implement stream of events (removal/addition of graph elements, state changes,
-// routemap changes, etc.)
 func (h *HTTPApi) eventStreamGraph(w http.ResponseWriter, r *http.Request) {
 	graphC := h.m.Graph.EventDumpChannel()
 	preloadChannel := make(chan eventsource.Event, 0)
@@ -168,7 +164,6 @@ func (h *HTTPApi) eventStreamGraph(w http.ResponseWriter, r *http.Request) {
 }
 
 func httpAPI(m *mapper.Mapper) {
-	// TODO: API endpoint
 	// Create helpful HTTP endpoint for debugging
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 

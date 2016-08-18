@@ -12,18 +12,9 @@ Parts TODO:
         think are having issues
     - aggregation
         -- route around nodes that can't talk to aggregation nodes
+        -- auto-sharding (probably based on peername)
 
 General TODO:
-    - Metrics
-        -- global counters (total)
-            - successful/failed pings
-            - successful/failed maps
-        -- gauges (current count)
-            -- current peers
-            -- current routes (+ per-state)
-            -- current nodes
-            -- current edges
-        -- some "graph" metrics (connectivity, etc.)
     - Better UI
         -- separate views for graph vs routes etc.
         -- visualization for latency / loss / etc

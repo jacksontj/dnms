@@ -71,6 +71,7 @@ func main() {
 	}
 
 	// TODO: background thing to join if we end up alone?
+	// or if people disconnect
 	// Join if we can
 	mlist.Join([]string{*peerStr})
 
