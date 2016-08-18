@@ -23,7 +23,6 @@ General TODO:
         -- use the meta field
             - include "role"
             - include http endpoint info (port at least)
-    - rename "NetworkLink" -> "NetworkEdge"
     - switch aggregation from pull to push
 
 Metrics to figure out:
