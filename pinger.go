@@ -34,7 +34,7 @@ func (p *Pinger) PingPeers() {
 		for peer := range peerChan {
 			p.PingPeer(peer)
 			// TODO configurable rate
-			time.Sleep(time.Second * 1)
+			time.Sleep(time.Millisecond * 100)
 		}
 	}
 }
