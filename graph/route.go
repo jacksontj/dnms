@@ -24,7 +24,8 @@ type RoutePingResponse struct {
 // world before we are useful
 // TODO: stats about route health
 type NetworkRoute struct {
-	Path []*NetworkNode `json:"path"`
+	Path []string       `json:"path"`
+	path []*NetworkNode `json:"path"`
 
 	// Network statistics
 	State graphState `json:"state"` // TODO: better handle in the serialization
@@ -41,7 +42,7 @@ type NetworkRoute struct {
 
 func (r *NetworkRoute) Key() string {
 	h := md5.New()
-	for _, node := range r.Path {
+	for _, node := range r.path {
 		io.WriteString(h, node.Name)
 	}
 	return hex.EncodeToString(h.Sum(nil))
@@ -91,7 +92,7 @@ func (r *NetworkRoute) SamePath(path []string) bool {
 	}
 
 	for i, hop := range path {
-		if hop != r.Path[i].Name {
+		if hop != r.Path[i] {
 			return false
 		}
 	}
@@ -106,7 +107,7 @@ func (r *NetworkRoute) SamePathReverse(path []string) bool {
 	}
 
 	for i, hop := range path {
-		if hop != r.Path[len(r.Path)-1-i].Name {
+		if hop != r.Path[len(r.Path)-1-i] {
 			return false
 		}
 	}
@@ -114,11 +115,9 @@ func (r *NetworkRoute) SamePathReverse(path []string) bool {
 }
 
 func (r *NetworkRoute) Hops() []string {
-	hops := make([]string, 0, len(r.Path))
-	for _, node := range r.Path {
-		hops = append(hops, node.Name)
-	}
-	return hops
+	tmp := make([]string, len(r.Path))
+	copy(tmp, r.Path)
+	return tmp
 }
 
 // Fancy marshal method

@@ -24,16 +24,23 @@ func Subscribe(p *PeerGraphMap) chan bool {
 		for {
 			select {
 			case ev := <-stream.Events:
+				//logrus.Infof("Got Event: %v", ev.Event())
 				switch ev.Event() {
 
 				// Node events
 				case "addNodeEvent":
 					n := graph.NetworkNode{}
-					json.Unmarshal([]byte(ev.Data()), &n)
+					err := json.Unmarshal([]byte(ev.Data()), &n)
+					if err != nil {
+						logrus.Warningf("unable to unmarshal node: %v", err)
+					}
 					p.AddNode(&n)
 				case "updateNodeEvent":
 					n := graph.NetworkNode{}
-					json.Unmarshal([]byte(ev.Data()), &n)
+					err := json.Unmarshal([]byte(ev.Data()), &n)
+					if err != nil {
+						logrus.Warningf("unable to unmarshal node: %v", err)
+					}
 					node := p.Graph.GetNode(n.Name)
 					// TODO: some sort of "merge" method
 					if node != nil {
@@ -41,13 +48,19 @@ func Subscribe(p *PeerGraphMap) chan bool {
 					}
 				case "removeNodeEvent":
 					n := graph.NetworkNode{}
-					json.Unmarshal([]byte(ev.Data()), &n)
+					err := json.Unmarshal([]byte(ev.Data()), &n)
+					if err != nil {
+						logrus.Warningf("unable to unmarshal node: %v", err)
+					}
 					p.RemoveNode(&n)
 
 				// Link events
 				case "addLinkEvent":
 					l := graph.NetworkLink{}
-					json.Unmarshal([]byte(ev.Data()), &l)
+					err := json.Unmarshal([]byte(ev.Data()), &l)
+					if err != nil {
+						logrus.Warningf("unable to unmarshal link: %v", err)
+					}
 					p.AddLink(&l)
 				// TODO: update event
 				case "updateLinkEvent":
@@ -55,24 +68,36 @@ func Subscribe(p *PeerGraphMap) chan bool {
 					// TODO: some sort of "merge" method
 				case "removeLinkEvent":
 					l := graph.NetworkLink{}
-					json.Unmarshal([]byte(ev.Data()), &l)
+					err := json.Unmarshal([]byte(ev.Data()), &l)
+					if err != nil {
+						logrus.Warningf("unable to unmarshal link: %v", err)
+					}
 					p.RemoveLink(&l)
 
 				// route events
 				case "addRouteEvent":
 					r := graph.NetworkRoute{}
-					json.Unmarshal([]byte(ev.Data()), &r)
+					err := json.Unmarshal([]byte(ev.Data()), &r)
+					if err != nil {
+						logrus.Warningf("unable to unmarshal route: %v", err)
+					}
 					p.AddRoute(&r)
 				case "updateRouteEvent":
 					r := graph.NetworkRoute{}
-					json.Unmarshal([]byte(ev.Data()), &r)
+					err := json.Unmarshal([]byte(ev.Data()), &r)
+					if err != nil {
+						logrus.Warningf("unable to unmarshal route: %v", err)
+					}
 					route := p.Graph.GetRoute(r.Hops())
 
 					// TODO: some sort of "merge" method
 					route.State = r.State
 				case "removeRouteEvent":
 					r := graph.NetworkRoute{}
-					json.Unmarshal([]byte(ev.Data()), &r)
+					err := json.Unmarshal([]byte(ev.Data()), &r)
+					if err != nil {
+						logrus.Warningf("unable to unmarshal route: %v", err)
+					}
 					p.RemoveRoute(&r)
 
 				}

@@ -87,7 +87,7 @@ func (p *PeerGraphMap) AddLink(l *graph.NetworkLink) {
 }
 
 func (p *PeerGraphMap) addLink(l *graph.NetworkLink) {
-	link, added := p.Graph.IncrLink(l.Src.Name, l.Dst.Name, l)
+	link, added := p.Graph.IncrLink(l.Src, l.Dst, l)
 	if added {
 		p.linksMap[link] = 0
 	}
@@ -101,7 +101,7 @@ func (p *PeerGraphMap) RemoveLink(l *graph.NetworkLink) {
 }
 
 func (p *PeerGraphMap) removeLink(l *graph.NetworkLink) {
-	link, removed := p.Graph.DecrLink(l.Src.Name, l.Dst.Name)
+	link, removed := p.Graph.DecrLink(l.Src, l.Dst)
 	p.linksMap[link]--
 
 	if removed && p.linksMap[link] != 0 {

@@ -180,15 +180,17 @@ func (g *NetworkGraph) IncrLink(src, dst string, newLink *NetworkLink) (*Network
 			srcNode, _ := g.IncrNode(src, nil)
 			dstNode, _ := g.IncrNode(dst, nil)
 			l = &NetworkLink{
-				Src: srcNode,
-				Dst: dstNode,
+				Src: srcNode.Name,
+				src: srcNode,
+				Dst: dstNode.Name,
+				dst: dstNode,
 			}
 		} else {
-			srcNode, _ := g.IncrNode(src, newLink.Src)
-			dstNode, _ := g.IncrNode(dst, newLink.Dst)
+			srcNode, _ := g.IncrNode(src, newLink.src)
+			dstNode, _ := g.IncrNode(dst, newLink.dst)
 			// update child pointers
-			newLink.Src = srcNode
-			newLink.Dst = dstNode
+			newLink.src = srcNode
+			newLink.dst = dstNode
 			l = newLink
 		}
 		g.LinksMap[key] = l
@@ -270,25 +272,30 @@ func (g *NetworkGraph) IncrRoute(hops []string, newRoute *NetworkRoute) (*Networ
 				}
 			}
 			route = &NetworkRoute{
-				Path:       path,
+				Path:       hops,
+				path:       path,
 				State:      Up,
 				metricRing: ring.New(100), // TODO: config
 				mLock:      &sync.RWMutex{},
 				updateChan: g.internalEvents,
 			}
 		} else {
-			for i, node := range newRoute.Path {
-				node, _ := g.IncrNode(node.Name, node)
+			newRoute.path = make([]*NetworkNode, len(newRoute.Path))
+			for i, nodeName := range newRoute.Path {
+				// Increment the node (this will convert the name to a pointer)
+				node, _ := g.IncrNode(nodeName, nil)
+				// set the pointer in our `path`
+				newRoute.path[i] = node
+
 				// If there was something prior-- lets add the link as well
 				if i-1 >= 0 {
-					g.IncrLink(newRoute.Path[i-1].Name, node.Name, nil)
+					g.IncrLink(newRoute.path[i-1].Name, nodeName, nil)
 				}
-				// re-set the node in the path, in case its not the same pointer
-				newRoute.Path[i] = node
 			}
 			route = newRoute
 			route.updateChan = g.internalEvents
 		}
+
 		g.RoutesMap[key] = route
 
 		g.internalEvents <- &Event{
@@ -330,10 +337,10 @@ func (g *NetworkGraph) DecrRoute(hops []string) (*NetworkRoute, bool) {
 	r.refCount--
 	if r.refCount == 0 {
 		// decrement all the links/nodes as well
-		for i, node := range r.Path {
-			g.DecrNode(node.Name)
+		for i, nodeName := range r.Path {
+			g.DecrNode(nodeName)
 			if i-1 >= 0 {
-				g.DecrLink(r.Path[i-1].Name, node.Name)
+				g.DecrLink(r.Path[i-1], nodeName)
 			}
 		}
 

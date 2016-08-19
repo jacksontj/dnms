@@ -247,11 +247,11 @@
 
         source.addEventListener('addLinkEvent', function(e) {
             var data = JSON.parse(e.data);
-            graph.addLink(data.src.name, data.dst.name, '20');
+            graph.addLink(data.src, data.dst, '20');
         }, false);
         source.addEventListener('removeLinkEvent', function(e) {
             var data = JSON.parse(e.data);
-            graph.removeLink(data.src.name, data.dst.name);
+            graph.removeLink(data.src, data.dst);
         }, false);
 
     } else {
