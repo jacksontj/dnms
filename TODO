@@ -12,6 +12,11 @@ TODO:
         - configurable ping rate
         - configurable map rate
         - metric update events (on routes)
+    - Better pings
+        - send multiple packets
+            -- measure jitter
+            -- check ordering
+    - separate the traceroute lib into a CLI + lib
 
 In the future:
     - support TCP pings
