@@ -5,6 +5,9 @@ TODO:
         -- switch from pull to push
         -- route around nodes that can't talk to aggregation nodes
         -- auto-sharding (probably based on peername)
+        -- sharding boolean
+        -- Saggregator (super aggregator)
+        -- weighted hash to aggregator based on # of peers
     - memberlist: use the meta field
         -- include "role"
         -- include http endpoint info (port at least)?
@@ -18,6 +21,7 @@ TODO:
             -- check ordering
     - separate the traceroute lib into a CLI + lib
     - Cleanup state serialization -- preferrably a string instead of a uint8 (up/suspect/down instead of 0/1/2)
+    - change "route" to not include src/dst nodes (to reduce redundant routes).
 
 In the future:
     - support TCP pings
