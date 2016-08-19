@@ -8,6 +8,10 @@ TODO:
     - memberlist: use the meta field
         -- include "role"
         -- include http endpoint info (port at least)?
+    - configs
+        - configurable ping rate
+        - configurable map rate
+        - metric update events (on routes)
 
 In the future:
     - support TCP pings
