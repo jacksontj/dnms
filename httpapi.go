@@ -34,20 +34,22 @@ func (h *HTTPApi) Start() {
 	// but probably want to separate by "topology" "routing" or something like that
 
 	// TODO: use the better mux?
-	// Graph endpoints
 	mux := http.NewServeMux()
+
+	// Graph endpoints
 	mux.HandleFunc("/v1/graph", h.showGraph)
 	mux.HandleFunc("/v1/graph/nodes", h.showNodes)
 	mux.HandleFunc("/v1/graph/edges", h.showEdges)
 	mux.HandleFunc("/v1/graph/routes", h.showRoutes)
 
+	// Mapper endpoints
 	// all of our peers
 	mux.HandleFunc("/v1/mapper/peers", h.showPeers)
-
 	// routemap endpoints
 	mux.HandleFunc("/v1/mapper/routemap", h.showRouteMap)
 
-	// event endpoint
+
+	// events endpoint
 	mux.HandleFunc("/v1/events/graph", h.eventStreamGraph)
 	// Create event listener to pull events from mapper and push into eventBroker
 	go func() {

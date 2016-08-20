@@ -90,9 +90,6 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		// TODO: configurable time
 		conn.SetDeadline(time.Now().Add(time.Second))
 
-		// TODO: figure out how to get the message back...
-		// seems that I might have to add some methods to get at `WriteToUDP`
-		// in memberlist
 		conn.Write(buf)
 
 		// get a response from the ping
