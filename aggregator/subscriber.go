@@ -2,6 +2,7 @@ package aggregator
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/jacksontj/dnms/graph"
@@ -13,11 +14,19 @@ import (
 func Subscribe(p *PeerGraphMap) chan bool {
 	exitChan := make(chan bool)
 	go func() {
-		stream, err := eventsource.Subscribe("http://"+p.Name+":12345/v1/events/graph", "")
-		if err != nil {
-			logrus.Fatalf("Error subscribing: %v", err)
+		var stream *eventsource.Stream
+		for {
+			logrus.Infof("connecting to peer: %v", p.Name)
+			var err error
+			stream, err = eventsource.Subscribe("http://"+p.Name+":12345/v1/events/graph", "")
+			if err != nil {
+				logrus.Errorf("Error subscribing, retrying: %v", err)
+				time.Sleep(time.Second)
+			} else {
+				break
+			}
 		}
-		logrus.Infof("connecting to peer: %v", p.Name)
+
 		// defer a removal in case the peer disconnects (or blips)
 		defer p.cleanup()
 
