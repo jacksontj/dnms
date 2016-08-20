@@ -82,7 +82,6 @@ func (m *Mapper) RemovePeer(p Peer) {
 	}
 }
 
-// TODO: randomize shuffle (since this is used for mapping and pinging
 // TODO: better, since this will be concurrent
 func (m *Mapper) IterPeers() chan *Peer {
 	peerChan := make(chan *Peer)
@@ -94,6 +93,9 @@ func (m *Mapper) IterPeers() chan *Peer {
 			pKeys = append(pKeys, key)
 		}
 		m.peerLock.RUnlock()
+		// shuffle the keys, this way the cluster won't all do them in the
+		// same order
+		Shuffle(pKeys)
 		for _, key := range pKeys {
 			m.peerLock.RLock()
 			peer, ok := m.peerMap[key]

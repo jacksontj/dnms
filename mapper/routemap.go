@@ -66,6 +66,9 @@ func (r *RouteMap) IterRoutes(dstKey string, keysChan chan string) {
 				nodeMapKeys = append(nodeMapKeys, key)
 			}
 			r.lock.RUnlock()
+			// shuffle the keys, this way the cluster won't all do them in the
+			// same order
+			Shuffle(nodeMapKeys)
 
 			for _, key := range nodeMapKeys {
 				r.lock.RLock()
