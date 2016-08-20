@@ -46,6 +46,7 @@ func (p *AggGraphMap) RemovePeer(peer string) {
 	}
 
 	pmap.cleanup()
+	pmap.Stop()
 	delete(p.peerMap, peer)
 }
 

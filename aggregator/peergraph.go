@@ -150,30 +150,36 @@ func (p *PeerGraphMap) removeRoute(r *graph.NetworkRoute) {
 // remove all routes associated with this peer
 func (p *PeerGraphMap) cleanup() {
 	// remove all routes
-	p.routesLock.RLock()
+	p.routesLock.Lock()
 	for route, count := range p.routesMap {
 		for x := 0; x < count; x++ {
 			p.removeRoute(route)
 		}
+		delete(p.routesMap, route)
 	}
-	p.routesLock.RUnlock()
+	p.routesLock.Unlock()
 
 	// remove all links
-	p.linksLock.RLock()
+	p.linksLock.Lock()
 	for link, count := range p.linksMap {
 		for x := 0; x < count; x++ {
 			p.removeLink(link)
 		}
+		delete(p.linksMap, link)
 	}
-	p.linksLock.RUnlock()
+	p.linksLock.Unlock()
 
 	// remove all nodes
-	p.nodesLock.RLock()
+	p.nodesLock.Lock()
 	for node, count := range p.nodesMap {
 		for x := 0; x < count; x++ {
 			p.removeNode(node)
 		}
+		delete(p.nodesMap, node)
 	}
-	p.nodesLock.RUnlock()
+	p.nodesLock.Unlock()
+}
+
+func (p *PeerGraphMap) Stop() {
 	p.subscriberExit <- false
 }

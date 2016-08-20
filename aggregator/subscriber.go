@@ -8,7 +8,6 @@ import (
 	"github.com/jacksontj/eventsource"
 )
 
-// TODO: reconnect if the subsciber disconnects and we weren't asked to cancel
 // Subscripe to dest, consuming events into PeerGraphMap.
 // We'll return a bool channel which can be used to cancel the subscription
 func Subscribe(p *PeerGraphMap) chan bool {
@@ -18,11 +17,18 @@ func Subscribe(p *PeerGraphMap) chan bool {
 		if err != nil {
 			logrus.Fatalf("Error subscribing: %v", err)
 		}
+		logrus.Infof("connecting to peer: %v", p.Name)
 		// defer a removal in case the peer disconnects (or blips)
 		defer p.cleanup()
 
 		for {
 			select {
+			// handle errors-- all of these mean a disconnect/reconnect
+			case err, ok := <-stream.Errors:
+				logrus.Debugf("stream error, reconnecting: %v %v", err, ok)
+				// we need to remove everything we know about this peer-- since
+				// the new connection will re-seed on the new connection
+				p.cleanup()
 			case ev := <-stream.Events:
 				//logrus.Infof("Got Event: %v", ev.Event())
 				switch ev.Event() {
