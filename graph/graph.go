@@ -180,17 +180,17 @@ func (g *NetworkGraph) IncrLink(src, dst string, newLink *NetworkLink) (*Network
 			srcNode, _ := g.IncrNode(src, nil)
 			dstNode, _ := g.IncrNode(dst, nil)
 			l = &NetworkLink{
-				Src: srcNode.Name,
-				src: srcNode,
-				Dst: dstNode.Name,
-				dst: dstNode,
+				SrcName: srcNode.Name,
+				srcNode: srcNode,
+				DstName: dstNode.Name,
+				dstNode: dstNode,
 			}
 		} else {
-			srcNode, _ := g.IncrNode(src, newLink.src)
-			dstNode, _ := g.IncrNode(dst, newLink.dst)
+			srcNode, _ := g.IncrNode(src, newLink.srcNode)
+			dstNode, _ := g.IncrNode(dst, newLink.dstNode)
 			// update child pointers
-			newLink.src = srcNode
-			newLink.dst = dstNode
+			newLink.srcNode = srcNode
+			newLink.dstNode = dstNode
 			l = newLink
 		}
 		g.LinksMap[key] = l

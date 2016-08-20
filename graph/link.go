@@ -2,10 +2,10 @@
 package graph
 
 type NetworkLink struct {
-	Src string `json:"src"`
-	src *NetworkNode
-	Dst string `json:"dst"`
-	dst *NetworkNode
+	SrcName string `json:"src"`
+	srcNode *NetworkNode
+	DstName string `json:"dst"`
+	dstNode *NetworkNode
 
 	refCount int
 }
