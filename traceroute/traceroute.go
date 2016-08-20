@@ -1,4 +1,3 @@
-// TODO: support ipv6
 // Package traceroute provides functions for executing a tracroute to a remote
 // host.
 package traceroute
