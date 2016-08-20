@@ -144,7 +144,7 @@ func Traceroute(dest string, options *TracerouteOptions, c ...chan TracerouteHop
 		defer syscall.Close(sendSocket)
 
 		// Bind to the local socket to listen for ICMP packets
-		syscall.Bind(recvSocket, &syscall.SockaddrInet4{Port: options.DstPort()})
+		syscall.Bind(recvSocket, sourceSockaddr)
 
 		if options.SrcPort() > 0 {
 			// if srcPort is set, bind to that as well
