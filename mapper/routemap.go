@@ -153,6 +153,11 @@ func (r *RouteMap) MarshalJSON() ([]byte, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
-	// just return the map (the rest are really just indexes)
-	return json.Marshal(r.NodeRouteMap)
+	// TODO: iteratively create this-- making copies is a bit lame :/
+	// return map of key -> route.Key()
+	tmp := make(map[string]string)
+	for k, route := range r.NodeRouteMap {
+		tmp[k] = route.Key()
+	}
+	return json.Marshal(tmp)
 }

@@ -82,6 +82,7 @@ func (m *Mapper) RemovePeer(p Peer) {
 	}
 }
 
+// TODO: randomize shuffle (since this is used for mapping and pinging
 // TODO: better, since this will be concurrent
 func (m *Mapper) IterPeers() chan *Peer {
 	peerChan := make(chan *Peer)
@@ -173,7 +174,12 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 		_, ok := m.peerMap[p.Name]
 		if ok {
 			// Add new one
-			newRoute, _ := m.Graph.IncrRoute(path, nil)
+			// TODO: remove? for now we'll try storing only the "middle" parts of the
+			// route, since our goal is to map the network-- not so much the peers
+			//logrus.Infof("path: %v", path)
+			//newRoute, _ := m.Graph.IncrRoute(path, nil)
+			logrus.Infof("path: %v", path[1:len(path)-1])
+			newRoute, _ := m.Graph.IncrRoute(path[1:len(path)-1], nil)
 			m.RouteMap.UpdateRouteOption(m.localName, srcPort, p.String(), newRoute)
 
 			// Remove old one if it exists
