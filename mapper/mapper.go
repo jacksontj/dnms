@@ -82,6 +82,7 @@ func (m *Mapper) RemovePeer(p Peer) {
 	}
 }
 
+// TODO: randomize shuffle (since this is used for mapping and pinging
 // TODO: better, since this will be concurrent
 func (m *Mapper) IterPeers() chan *Peer {
 	peerChan := make(chan *Peer)

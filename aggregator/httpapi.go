@@ -28,20 +28,20 @@ func NewHTTPApi(p *AggGraphMap) *HTTPApi {
 	return api
 }
 
-func (h *HTTPApi) Start() {
+func (h *HTTPApi) Start(mux *http.ServeMux) {
 	// TODO: think more about the namespacing of this API. Most thing belong to "mapper"
 	// but probably want to separate by "topology" "routing" or something like that
 
-	// TODO: use the better mux?
 	// Graph endpoints
-	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/graph", h.showGraph)
-	mux.HandleFunc("/v1/graph/nodes", h.showNodes)
-	mux.HandleFunc("/v1/graph/edges", h.showEdges)
-	mux.HandleFunc("/v1/graph/routes", h.showRoutes)
+	mux.HandleFunc("/v1/aggregator/graph", h.showGraph)
+	mux.HandleFunc("/v1/aggregator/graph/nodes", h.showNodes)
+	mux.HandleFunc("/v1/aggregator/graph/edges", h.showEdges)
+	mux.HandleFunc("/v1/aggregator/graph/routes", h.showRoutes)
+
+	// TODO: aggregate mapper data
 
 	// event endpoint
-	mux.HandleFunc("/v1/events/graph", h.eventStreamGraph)
+	mux.HandleFunc("/v1/aggregator/events/graph", h.eventStreamGraph)
 	// Create event listener to pull events from mapper and push into eventBroker
 	go func() {
 		for {
@@ -62,8 +62,6 @@ func (h *HTTPApi) Start() {
 		}
 
 	}()
-
-	go http.ListenAndServe(":8888", mux)
 }
 
 // TODO: better, terrible things are here

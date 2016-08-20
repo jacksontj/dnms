@@ -228,12 +228,17 @@
     // initial load of the graph
     if (!!window.EventSource) {
         var srcHost = getQueryParam('source');
-        var source;
+        var sourceURL;
         if (srcHost != null) {
-            source = new EventSource('http://' + srcHost + '/v1/events/graph');
+            sourceURL = 'http://' + srcHost + '/v1/'
         } else {
-            source = new EventSource('http://127.0.0.1:8888/v1/events/graph');
+            sourceURL = 'http://127.0.0.1/v1/'
         }
+        if (getQueryParam('aggregator') != null) {
+            sourceURL += 'aggregator/'
+        }
+        sourceURL += 'events/graph'
+        var source = new EventSource(sourceURL);
 
         // All the event listeners
         source.addEventListener('addNodeEvent', function(e) {

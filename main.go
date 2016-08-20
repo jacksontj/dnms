@@ -4,6 +4,7 @@ import (
 	"flag"
 	"time"
 
+	"net/http"
 	_ "net/http/pprof"
 
 	"github.com/Sirupsen/logrus"
@@ -43,20 +44,23 @@ func main() {
 	m.Start()
 
 	// TODO pass additional config
-	// Start HTTP API
+	// Start HTTP APIs
+	mux := http.NewServeMux()
 	api := NewHTTPApi(m)
-	api.Start()
+	api.Start(mux)
 
 	// If we are an aggregator start that
 	var aggMap *aggregator.AggGraphMap
 	if *aggNode {
 		aggMap = aggregator.NewAggGraphMap()
 		api := aggregator.NewHTTPApi(aggMap)
-		api.Start()
+		api.Start(mux)
 		// TODO: through something better than http, it is local after all
 		// subscribe to ourself
 		aggMap.AddPeer("127.0.0.1")
 	}
+
+	go http.ListenAndServe(":12345", mux)
 
 	// Wire up the delegate-- he'll handle pings and node up/down events
 	delegate := NewDNMSDelegate(m, aggMap)

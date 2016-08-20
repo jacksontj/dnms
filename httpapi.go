@@ -29,12 +29,9 @@ func NewHTTPApi(m *mapper.Mapper) *HTTPApi {
 	return api
 }
 
-func (h *HTTPApi) Start() {
+func (h *HTTPApi) Start(mux *http.ServeMux) {
 	// TODO: think more about the namespacing of this API. Most thing belong to "mapper"
 	// but probably want to separate by "topology" "routing" or something like that
-
-	// TODO: use the better mux?
-	mux := http.NewServeMux()
 
 	// Graph endpoints
 	mux.HandleFunc("/v1/graph", h.showGraph)
@@ -47,7 +44,6 @@ func (h *HTTPApi) Start() {
 	mux.HandleFunc("/v1/mapper/peers", h.showPeers)
 	// routemap endpoints
 	mux.HandleFunc("/v1/mapper/routemap", h.showRouteMap)
-
 
 	// events endpoint
 	mux.HandleFunc("/v1/events/graph", h.eventStreamGraph)
@@ -71,8 +67,6 @@ func (h *HTTPApi) Start() {
 		}
 
 	}()
-
-	go http.ListenAndServe(":12345", mux)
 }
 
 // TODO: better, terrible things are here
