@@ -212,6 +212,7 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 		for _, i := range missingPath {
 			prefixParts := make([]string, 0)
 			suffixParts := make([]string, 0)
+			// find the first path entry with a name before us
 			for x := i - 1; x >= 0; x-- {
 				// Prepend if it exists
 				prefixParts = append([]string{path[x]}, prefixParts...)
@@ -219,6 +220,7 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 					break
 				}
 			}
+			// find the first path entry with a name after us
 			for x := i + 1; x < len(path); x++ {
 				suffixParts = append(suffixParts, path[x])
 				if path[x] != "*" {
@@ -246,17 +248,15 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 		_, ok := m.peerMap[p.Name]
 		if ok {
 			// Add new one
-			// TODO: remove? for now we'll try storing only the "middle" parts of the
-			// route, since our goal is to map the network-- not so much the peers
-			//logrus.Infof("path: %v", path)
-			//newRoute, _ := m.Graph.IncrRoute(path, nil)
-			logrus.Infof("path: %v", path[1:len(path)-1])
 			newRoute, _ := m.Graph.IncrRoute(path[1:len(path)-1], nil)
 			m.RouteMap.UpdateRouteOption(m.localName, srcPort, p.String(), newRoute)
 
 			// Remove old one if it exists
 			if currRoute != nil {
+				logrus.Infof("replaced path: %v", path[1:len(path)-1])
 				m.Graph.DecrRoute(currRoute.Hops())
+			} else {
+				logrus.Infof("new path: %v", path[1:len(path)-1])
 			}
 		}
 		m.peerLock.RUnlock()
