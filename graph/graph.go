@@ -171,7 +171,7 @@ func (g *NetworkGraph) DecrNode(name string) (*NetworkNode, bool) {
 }
 
 func (g *NetworkGraph) IncrLink(src, dst string, newLink *NetworkLink) (*NetworkLink, bool) {
-	key := src + "," + dst
+	key := src + ";" + dst
 	g.LinksLock.Lock()
 	defer g.LinksLock.Unlock()
 	l, ok := g.LinksMap[key]
@@ -206,7 +206,7 @@ func (g *NetworkGraph) IncrLink(src, dst string, newLink *NetworkLink) (*Network
 func (g *NetworkGraph) GetLink(src, dst string) *NetworkLink {
 	g.LinksLock.RLock()
 	defer g.LinksLock.RUnlock()
-	key := src + "," + dst
+	key := src + ";" + dst
 	l, _ := g.LinksMap[key]
 	return l
 }
@@ -218,7 +218,7 @@ func (g *NetworkGraph) GetLinkCount() int {
 }
 
 func (g *NetworkGraph) DecrLink(src, dst string) (*NetworkLink, bool) {
-	key := src + "," + dst
+	key := src + ";" + dst
 	g.LinksLock.Lock()
 	defer g.LinksLock.Unlock()
 	l, ok := g.LinksMap[key]

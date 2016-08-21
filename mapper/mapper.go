@@ -1,13 +1,16 @@
 package mapper
 
 import (
+	"fmt"
+	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/jacksontj/dnms/graph"
-	"github.com/jacksontj/dnms/traceroute"
+	"github.com/jacksontj/traceroute"
 )
 
 // TODO move elsewhere?
@@ -145,15 +148,31 @@ func (m *Mapper) mapPeers() {
 // Map a single peer on a single source port
 func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 
-	options := traceroute.TracerouteOptions{}
-	options.SetSrcPort(srcPort) // TODO: config
-	options.SetDstPort(p.Port)  // TODO: config
-	options.SetMaxHops(20)
+	srcIP, err := traceroute.GetLocalIP()
+	if err != nil {
+		logrus.Errorf("unable to get a local address to send from: %v", err)
+		return
+	}
+	tracerouteOpts := &traceroute.TracerouteOptions{
+		SourceAddr: srcIP,
+		SourcePort: srcPort,
 
-	ret, err := traceroute.Traceroute(
-		p.Name, // TODO: take the IP direct
-		&options,
-	)
+		DestinationAddr: net.ParseIP(p.Name),
+		DestinationPort: p.Port,
+
+		// enumerated value of tcp/udp/icmp
+		ProbeType: traceroute.UdpProbe,
+
+		// TTL options
+		StartingTTL: 1,
+		MaxTTL:      30,
+
+		// Probe options
+		ProbeTimeout: time.Second,
+		ProbeCount:   1,
+	}
+
+	result, err := traceroute.Traceroute(tracerouteOpts)
 	if err != nil {
 		logrus.Infof("Traceroute err: %v", err)
 		return
@@ -161,10 +180,60 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 
 	logrus.Infof("Traceroute %d -> %s: complete", srcPort, p.Name)
 
-	path := make([]string, 0, len(ret.Hops))
+	path := make([]string, 0, len(result.Hops))
+	missingPath := make([]int, 0)
 
-	for _, hop := range ret.Hops {
-		path = append(path, hop.AddressString())
+	for i, hop := range result.Hops {
+		// if there was no address in the response, lets just keep track of it
+		// we'll replace it with something unique to annotate this specific unknown node
+		if hop.Responses[0].Address == nil {
+			path = append(path, "*")
+			missingPath = append(missingPath, i)
+		} else {
+			path = append(path, hop.Responses[0].Address.String())
+		}
+	}
+
+	// if there where any names missing (something in missingPath) then lets
+	// make a unique name for this missing node.
+	// Since we are just mapping, we don't know much about this node-- just
+	// that is is between some other number of nodes. Because of this we'll
+	// create the name of the node based on the surrounding nodes in the route
+	// to avoid large numbers of duplicates (especially if the unknown node is
+	// on either end of the route.
+	// So if we have a route of: foo -> * -> * -> bar -> baz -> qux
+	// the "*" nodes will end up with keys like:
+	//		first "*": foo|*|*,bar
+	// 		second "*": foo,*|*|,bar
+	//
+	// Note: the item surrounded by the "|" is the specific node we are looking at
+	if len(missingPath) > 0 {
+		namesToReplace := make(map[int]string)
+		for _, i := range missingPath {
+			prefixParts := make([]string, 0)
+			suffixParts := make([]string, 0)
+			for x := i - 1; x >= 0; x-- {
+				// Prepend if it exists
+				prefixParts = append([]string{path[x]}, prefixParts...)
+				if path[x] != "*" {
+					break
+				}
+			}
+			for x := i + 1; x < len(path); x++ {
+				suffixParts = append(suffixParts, path[x])
+				if path[x] != "*" {
+					break
+				}
+			}
+			prefix := strings.Join(prefixParts, ",")
+			suffix := strings.Join(suffixParts, ",")
+			namesToReplace[i] = fmt.Sprintf("%s|%s|%s", prefix, "*", suffix)
+		}
+		// replace all the names
+		for i, newHopName := range namesToReplace {
+			path[i] = newHopName
+		}
+
 	}
 	logrus.Debugf("traceroute path: %v", path)
 
