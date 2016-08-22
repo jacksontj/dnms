@@ -253,7 +253,11 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 
 			// Remove old one if it exists
 			if currRoute != nil {
-				logrus.Infof("replaced path: %v", path[1:len(path)-1])
+				// TODO: if the route is compatible (meaning there are fewer links
+				// because something returned "*") then lets keep the old one
+				// for some period of time
+				logrus.Infof("replaced path old: %v", currRoute.Hops())
+				logrus.Infof("replaced path new: %v", path[1:len(path)-1])
 				m.Graph.DecrRoute(currRoute.Hops())
 			} else {
 				logrus.Infof("new path: %v", path[1:len(path)-1])
