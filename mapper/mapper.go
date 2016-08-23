@@ -237,6 +237,12 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 		}
 
 	}
+	// strip out first and last-- this makes the graph more connected, since we
+	// aren't really interested in mapping peers-- so much as the network in the
+	// middle. We don't lose data, because the RouteMap	keeps track of which peers
+	// send down which routes
+	// TLDR; the goal is to not have a peer in a `path`
+	path = path[:len(path)-1]
 	logrus.Debugf("traceroute path: %v", path)
 
 	currRoute := m.RouteMap.GetRouteOption(m.localName, srcPort, p.Name, p.Port)
@@ -248,7 +254,7 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 		_, ok := m.peerMap[p.Name]
 		if ok {
 			// Add new one
-			newRoute, _ := m.Graph.IncrRoute(path[1:len(path)-1], nil)
+			newRoute, _ := m.Graph.IncrRoute(path, nil)
 			m.RouteMap.UpdateRouteOption(m.localName, srcPort, p.String(), newRoute)
 
 			// Remove old one if it exists
@@ -257,10 +263,10 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 				// because something returned "*") then lets keep the old one
 				// for some period of time
 				logrus.Infof("replaced path old: %v", currRoute.Hops())
-				logrus.Infof("replaced path new: %v", path[1:len(path)-1])
+				logrus.Infof("replaced path new: %v", path)
 				m.Graph.DecrRoute(currRoute.Hops())
 			} else {
-				logrus.Infof("new path: %v", path[1:len(path)-1])
+				logrus.Infof("new path: %v", path)
 			}
 		}
 		m.peerLock.RUnlock()
