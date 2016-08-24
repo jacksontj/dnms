@@ -82,3 +82,30 @@ func TestComplexRoutesBidirectional(t *testing.T) {
 		t.Errorf("paths don't match \nexpected=%v \ngot=%v", expected, newPath)
 	}
 }
+
+// Test that when both are missing a hop-- we get the shorter of the 2
+func TestShortenRoutes(t *testing.T) {
+	a := []string{"1", "1|*|*,*,5", "1,*|*|*,5", "1,*,*|*|5", "5"}
+	b := []string{"1", "2", "2|*|*,5", "2,*|*|5", "5"}
+	c := []string{"1", "1|*|*,4", "1,*|*|4", "4", "5"}
+	d := []string{"1", "1|*|3", "3", "3|*|5", "5"}
+
+	// tests, a, b, expected
+	tests := []([][]string){
+		[][]string{a, b, b},
+		[][]string{a, c, c},
+		[][]string{a, d, d},
+	}
+
+	for i, testSpec := range tests {
+		newPath, err := MergeRoutePath(testSpec[0], testSpec[1])
+		if err != nil {
+			t.Errorf("error merging clean: %v", err)
+		}
+
+		if !pathMatch(newPath, testSpec[2]) {
+			t.Errorf("%d paths don't match \nexpected=%v \ngot=%v", i, testSpec[2], newPath)
+		}
+	}
+
+}

@@ -1,10 +1,8 @@
 package mapper
 
 import (
-	"fmt"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -181,14 +179,12 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 	logrus.Infof("Traceroute %d -> %s: complete", srcPort, p.Name)
 
 	path := make([]string, 0, len(result.Hops))
-	missingPath := make([]int, 0)
 
-	for i, hop := range result.Hops {
+	for _, hop := range result.Hops {
 		// if there was no address in the response, lets just keep track of it
 		// we'll replace it with something unique to annotate this specific unknown node
 		if hop.Responses[0].Address == nil {
-			path = append(path, "*")
-			missingPath = append(missingPath, i)
+			path = append(path, graph.UNKNOWN_PATH)
 		} else {
 			path = append(path, hop.Responses[0].Address.String())
 		}
@@ -201,49 +197,8 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 	// TLDR; the goal is to not have a peer in a `path`
 	path = path[:len(path)-1]
 
-	// if there where any names missing (something in missingPath) then lets
-	// make a unique name for this missing node.
-	// Since we are just mapping, we don't know much about this node-- just
-	// that is is between some other number of nodes. Because of this we'll
-	// create the name of the node based on the surrounding nodes in the route
-	// to avoid large numbers of duplicates (especially if the unknown node is
-	// on either end of the route.
-	// So if we have a route of: foo -> * -> * -> bar -> baz -> qux
-	// the "*" nodes will end up with keys like:
-	//		first "*": foo|*|*,bar
-	// 		second "*": foo,*|*|,bar
-	//
-	// Note: the item surrounded by the "|" is the specific node we are looking at
-	if len(missingPath) > 0 {
-		namesToReplace := make(map[int]string)
-		for _, i := range missingPath {
-			prefixParts := make([]string, 0)
-			suffixParts := make([]string, 0)
-			// find the first path entry with a name before us
-			for x := i - 1; x >= 0; x-- {
-				// Prepend if it exists
-				prefixParts = append([]string{path[x]}, prefixParts...)
-				if path[x] != "*" {
-					break
-				}
-			}
-			// find the first path entry with a name after us
-			for x := i + 1; x < len(path); x++ {
-				suffixParts = append(suffixParts, path[x])
-				if path[x] != "*" {
-					break
-				}
-			}
-			prefix := strings.Join(prefixParts, ",")
-			suffix := strings.Join(suffixParts, ",")
-			namesToReplace[i] = fmt.Sprintf("%s|%s|%s", prefix, "*", suffix)
-		}
-		// replace all the names
-		for i, newHopName := range namesToReplace {
-			path[i] = newHopName
-		}
-
-	}
+	// Next, fill "*"s with keys to placehold
+	graph.FillPath(path)
 	logrus.Debugf("traceroute path: %v", path)
 
 	currRoute := m.RouteMap.GetRouteOption(m.localName, srcPort, p.Name, p.Port)
@@ -255,9 +210,6 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 		// check that this peer still exists
 		_, ok := m.peerMap[p.Name]
 		if ok {
-			// TODO: if the route is compatible (meaning there are fewer links
-			// because something returned "*") then lets keep the old one
-			// for some period of time
 
 			if currRoute != nil {
 				mergedPath, err := graph.MergeRoutePath(currRoute.Hops(), path)
