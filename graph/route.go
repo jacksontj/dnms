@@ -40,6 +40,16 @@ type NetworkRoute struct {
 	updateChan chan *Event
 }
 
+// TODO: we make the assumption here that the other route goes away-- which since
+// the only caller today is the merge stuff in mapper-- is safe. If that ever
+// changes we'll need to be more careful here-- as we are just pointing at
+// another ring-- which has its own pings going on
+func (r *NetworkRoute) Inherit(o *NetworkRoute) {
+	r.mLock.Lock()
+	defer r.mLock.Unlock()
+	r.metricRing = o.metricRing
+}
+
 func (r *NetworkRoute) Key() string {
 	h := md5.New()
 	for _, node := range r.path {

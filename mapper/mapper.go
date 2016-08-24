@@ -223,6 +223,8 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 
 					// Remove old one if it exists
 					if currRoute != nil {
+						// make the new one inherit from an old one if it exists
+						newRoute.Inherit(currRoute)
 						logrus.Infof("replaced path old: %v", currRoute.Hops())
 						logrus.Infof("replaced path new: %v", mergedPath)
 						m.Graph.DecrRoute(currRoute.Hops())
