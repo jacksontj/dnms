@@ -215,6 +215,12 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 				mergedPath, err := graph.MergeRoutePath(currRoute.Hops(), path)
 				// if there was no error, we can merge them
 				if err == nil {
+					// if the merged path is no different from the original path
+					// then there is no point in makind any changes
+					if currRoute.SamePath(mergedPath) {
+						return
+					}
+
 					logrus.Infof("we have a mergedpath!\na=%v\nb=%v", currRoute.Hops(), path)
 					// TODO: migrate/inherit the metrics
 					// Add new one
