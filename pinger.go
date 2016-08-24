@@ -83,8 +83,12 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		}
 		conn, err := net.DialUDP("udp", LocalAddr, &RemoteEP)
 		if err != nil {
-			// handle error
-			logrus.Errorf("unable to connect to peer: %v", err)
+			// If we got a non-retryable error, lets log it
+			if netErr, ok := err.(net.Error); !(ok && netErr.Temporary()) {
+				logrus.Errorf("unable to connect to peer: %v", err)
+			} else {
+				logrus.Debugf("Temporarily unable to connect to peer: %v", err)
+			}
 			continue
 		}
 		// TODO: configurable time
