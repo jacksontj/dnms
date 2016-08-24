@@ -39,15 +39,18 @@ func (r *RouteMap) GetRoute(key string) *graph.NetworkRoute {
 	return route
 }
 
-func (r *RouteMap) FindRoute(path []string) (string, bool) {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
-	for key, route := range r.NodeRouteMap {
-		if route.SamePathReverse(path) {
-			return key, true
+// Replace old route `o` with new route `n`, and return the number of times we did that
+func (r *RouteMap) ReplaceRoute(o, n *graph.NetworkRoute) int {
+	ret := 0
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	for k, v := range r.NodeRouteMap {
+		if v == o {
+			r.NodeRouteMap[k] = n
+			ret++
 		}
 	}
-	return "", false
+	return ret
 }
 
 // TODO: embed the key in the route struct, so we can return a channel of *NetworkRoute

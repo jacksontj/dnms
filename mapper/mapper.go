@@ -132,14 +132,14 @@ func (m *Mapper) mapPeers() {
 	for {
 		// TODO: config
 		srcPortStart := 33435
-		srcPortEnd := 33500
+		srcPortEnd := 33445
 
 		for srcPort := srcPortStart; srcPort < srcPortEnd; srcPort++ {
 			peerChan := m.IterPeers()
 			for peer := range peerChan {
 				m.mapPeer(peer, srcPort)
 				// TODO configurable rate
-				time.Sleep(time.Second)
+				time.Sleep(time.Millisecond * 100)
 			}
 		}
 	}
@@ -194,6 +194,13 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 		}
 	}
 
+	// strip out first and last-- this makes the graph more connected, since we
+	// aren't really interested in mapping peers-- so much as the network in the
+	// middle. We don't lose data, because the RouteMap	keeps track of which peers
+	// send down which routes
+	// TLDR; the goal is to not have a peer in a `path`
+	path = path[:len(path)-1]
+
 	// if there where any names missing (something in missingPath) then lets
 	// make a unique name for this missing node.
 	// Since we are just mapping, we don't know much about this node-- just
@@ -237,12 +244,6 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 		}
 
 	}
-	// strip out first and last-- this makes the graph more connected, since we
-	// aren't really interested in mapping peers-- so much as the network in the
-	// middle. We don't lose data, because the RouteMap	keeps track of which peers
-	// send down which routes
-	// TLDR; the goal is to not have a peer in a `path`
-	path = path[:len(path)-1]
 	logrus.Debugf("traceroute path: %v", path)
 
 	currRoute := m.RouteMap.GetRouteOption(m.localName, srcPort, p.Name, p.Port)
@@ -250,18 +251,52 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 	// If we don't have a current route, or the paths differ-- lets update
 	if currRoute == nil || !currRoute.SamePath(path) {
 		m.peerLock.RLock()
+		defer m.peerLock.RUnlock()
 		// check that this peer still exists
 		_, ok := m.peerMap[p.Name]
 		if ok {
+			// TODO: if the route is compatible (meaning there are fewer links
+			// because something returned "*") then lets keep the old one
+			// for some period of time
+
+			if currRoute != nil {
+				mergedPath, err := graph.MergeRoutePath(currRoute.Hops(), path)
+				// if there was no error, we can merge them
+				if err == nil {
+					logrus.Infof("we have a mergedpath!\na=%v\nb=%v", currRoute.Hops(), path)
+					// TODO: migrate/inherit the metrics
+					// Add new one
+					newRoute, _ := m.Graph.IncrRoute(mergedPath, nil)
+					m.RouteMap.UpdateRouteOption(m.localName, srcPort, p.String(), newRoute)
+
+					// Remove old one if it exists
+					if currRoute != nil {
+						logrus.Infof("replaced path old: %v", currRoute.Hops())
+						logrus.Infof("replaced path new: %v", mergedPath)
+						m.Graph.DecrRoute(currRoute.Hops())
+					} else {
+						logrus.Infof("new path: %v", mergedPath)
+					}
+					// TODO: do this better-- for now this works
+					// assuming we have a match, not only do we want to update
+					// this routemap entry-- we want to update everyone who is pointing
+					// at this route -- since we just made it better
+					numChangedRoutes := m.RouteMap.ReplaceRoute(currRoute, newRoute)
+					// fix the refcounts
+					for x := 0; x < numChangedRoutes; x++ {
+						m.Graph.IncrRoute(mergedPath, nil)
+						m.Graph.DecrRoute(currRoute.Hops())
+					}
+					return
+				}
+			}
+
 			// Add new one
 			newRoute, _ := m.Graph.IncrRoute(path, nil)
 			m.RouteMap.UpdateRouteOption(m.localName, srcPort, p.String(), newRoute)
 
 			// Remove old one if it exists
 			if currRoute != nil {
-				// TODO: if the route is compatible (meaning there are fewer links
-				// because something returned "*") then lets keep the old one
-				// for some period of time
 				logrus.Infof("replaced path old: %v", currRoute.Hops())
 				logrus.Infof("replaced path new: %v", path)
 				m.Graph.DecrRoute(currRoute.Hops())
@@ -269,6 +304,5 @@ func (m *Mapper) mapPeer(p *Peer, srcPort int) {
 				logrus.Infof("new path: %v", path)
 			}
 		}
-		m.peerLock.RUnlock()
 	}
 }
