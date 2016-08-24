@@ -1,48 +1,45 @@
 package graph
 
 import (
-	"net"
+	"strings"
 	"testing"
 )
 
-func validateGraph(t *testing.T, g *NetworkGraph, expectedNodes map[string]int, expectedLinks map[NetworkLinkKey]int, expectedRoutes map[RouteKey]RouteTestSpec) {
+func validateGraph(t *testing.T, g *NetworkGraph, expectedNodes map[string]int, expectedLinks map[string]int, expectedRoutes []RouteTestSpec) {
 
 	// Validate Nodes
 	// TODO: test for too many nodes
 	for ipString, count := range expectedNodes {
 		node := g.GetNode(ipString)
 		if node == nil {
-			t.Error("Node %s missing!", ipString)
+			t.Errorf("Node %s missing!", ipString)
 		} else {
-			if node.RefCount != count {
-				t.Error("Node %s has the wrong refcount expected=%d actual=%d", ipString, count, node.RefCount)
+			if node.refCount != count {
+				t.Errorf("Node %s has the wrong refCount expected=%d actual=%d", ipString, count, node.refCount)
 			}
 		}
 	}
 
 	// validate Links
 	for linkKey, count := range expectedLinks {
-		link := g.GetLink(linkKey.Src, linkKey.Dst)
+		link := g.GetLink(linkKey)
 		if link == nil {
-			t.Error("Link %v missing!", linkKey)
+			t.Errorf("Link %v missing!", linkKey)
 		} else {
-			if link.RefCount != count {
-				t.Error("Link %v has the wrong refcount expected=%d actual=%d", linkKey, count, link.RefCount)
+			if link.refCount != count {
+				t.Errorf("Link %v has the wrong refCount expected=%d actual=%d", linkKey, count, link.refCount)
 			}
 		}
 	}
 
 	// validate routes
-	for routeKey, rSpec := range expectedRoutes {
-		src, _ := net.ResolveUDPAddr("udp", routeKey.Src)
-		dst, _ := net.ResolveUDPAddr("udp", routeKey.Dst)
-
-		route := g.GetRoute(*src, *dst)
+	for _, rSpec := range expectedRoutes {
+		route := g.GetRoute(rSpec.Path)
 		if route == nil {
-			t.Error("Route %v missing!", routeKey)
+			t.Errorf("Route %v missing!", rSpec)
 		} else {
-			if route.RefCount != rSpec.Count {
-				t.Error("Route %v has the wrong refcount expected=%d actual=%d", routeKey, rSpec.Count, route.RefCount)
+			if route.refCount != rSpec.Count {
+				t.Errorf("Route %v has the wrong refCount expected=%d actual=%d", rSpec, rSpec.Count, route.refCount)
 			}
 		}
 	}
@@ -59,7 +56,7 @@ func TestNodes(t *testing.T) {
 
 	for ipString, count := range expectedNodes {
 		for i := 0; i < count; i++ {
-			g.IncrNode(ipString)
+			g.IncrNode(ipString, nil)
 		}
 	}
 
@@ -69,9 +66,9 @@ func TestNodes(t *testing.T) {
 func TestLinks(t *testing.T) {
 	g := Create()
 
-	expectedLinks := map[NetworkLinkKey]int{
-		NetworkLinkKey{"192.168.1.1", "192.168.1.2"}: 2,
-		NetworkLinkKey{"192.168.1.2", "192.168.1.3"}: 1,
+	expectedLinks := map[string]int{
+		"192.168.1.1;192.168.1.2": 2,
+		"192.168.1.2;192.168.1.3": 1,
 	}
 
 	expectedNodes := map[string]int{
@@ -81,8 +78,9 @@ func TestLinks(t *testing.T) {
 	}
 
 	for linkKey, count := range expectedLinks {
+		keyParts := strings.Split(linkKey, ";")
 		for i := 0; i < count; i++ {
-			g.IncrLink(linkKey.Src, linkKey.Dst)
+			g.IncrLink(keyParts[0], keyParts[1], nil)
 		}
 	}
 
@@ -97,8 +95,8 @@ type RouteTestSpec struct {
 
 func TestRoutes(t *testing.T) {
 	g := Create()
-	expectedRoutes := map[RouteKey]RouteTestSpec{
-		RouteKey{"192.168.1.1:1", "192.168.1.4:1"}: RouteTestSpec{
+	expectedRoutes := []RouteTestSpec{
+		RouteTestSpec{
 			Count: 1,
 			Path: []string{
 				"192.168.1.1",
@@ -109,61 +107,40 @@ func TestRoutes(t *testing.T) {
 		},
 	}
 
-	expectedLinks := map[NetworkLinkKey]int{
-		NetworkLinkKey{"192.168.1.1", "192.168.1.2"}: 1,
-		NetworkLinkKey{"192.168.1.2", "192.168.1.3"}: 1,
-		NetworkLinkKey{"192.168.1.3", "192.168.1.4"}: 1,
+	expectedLinks := map[string]int{
+		"192.168.1.1;192.168.1.2": 1,
+		"192.168.1.2;192.168.1.3": 1,
+		"192.168.1.3;192.168.1.4": 1,
 	}
 
 	expectedNodes := map[string]int{
-		"192.168.1.1": 1,
-		"192.168.1.2": 2,
-		"192.168.1.3": 2,
-		"192.168.1.4": 1,
+		"192.168.1.1": 2,
+		"192.168.1.2": 3,
+		"192.168.1.3": 3,
+		"192.168.1.4": 2,
 	}
 
-	for routeKey, rSpec := range expectedRoutes {
-		src, _ := net.ResolveUDPAddr("udp", routeKey.Src)
-		dst, _ := net.ResolveUDPAddr("udp", routeKey.Dst)
-
+	for _, rSpec := range expectedRoutes {
 		for i := 0; i < rSpec.Count; i++ {
-			g.IncrRoute(*src, *dst, rSpec.Path)
+			g.IncrRoute(rSpec.Path, nil)
 		}
 	}
 
 	validateGraph(t, g, expectedNodes, expectedLinks, expectedRoutes)
 
-	expectedRoutes = map[RouteKey]RouteTestSpec{
-		RouteKey{"192.168.1.1:1", "192.168.1.4:1"}: RouteTestSpec{
-			Count: 1,
-			Path: []string{
-				"192.168.1.1",
-				"192.168.1.4",
-			},
-		},
-	}
-
-	expectedLinks = map[NetworkLinkKey]int{
-		NetworkLinkKey{"192.168.1.1", "192.168.1.4"}: 1,
-	}
-
-	expectedNodes = map[string]int{
-		"192.168.1.1": 1,
-		"192.168.1.4": 1,
-	}
-
-	for routeKey, rSpec := range expectedRoutes {
-		src, _ := net.ResolveUDPAddr("udp", routeKey.Src)
-		dst, _ := net.ResolveUDPAddr("udp", routeKey.Dst)
-
-		for i := 0; i < rSpec.Count; i++ {
-			g.IncrRoute(*src, *dst, rSpec.Path)
-		}
-	}
-
-	validateGraph(t, g, expectedNodes, expectedLinks, expectedRoutes)
-
+	// Verify that we ended up with just 1
 	if g.GetRouteCount() != 1 {
-		t.Error("conflicting routes!")
+		t.Errorf("Wrong number of routes! expected=1 actual=%v", g.GetRouteCount())
 	}
+
+	for _, rSpec := range expectedRoutes {
+		for i := 0; i < rSpec.Count; i++ {
+			g.DecrRoute(rSpec.Path)
+		}
+	}
+	// Verify that dec afterwards got us down to 0
+	if g.GetRouteCount() != 0 {
+		t.Errorf("Wrong number of routes! expected=0 actual=%v", g.GetRouteCount())
+	}
+
 }

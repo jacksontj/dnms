@@ -203,10 +203,9 @@ func (g *NetworkGraph) IncrLink(src, dst string, newLink *NetworkLink) (*Network
 	return l, !ok
 }
 
-func (g *NetworkGraph) GetLink(src, dst string) *NetworkLink {
+func (g *NetworkGraph) GetLink(key string) *NetworkLink {
 	g.LinksLock.RLock()
 	defer g.LinksLock.RUnlock()
-	key := src + ";" + dst
 	l, _ := g.LinksMap[key]
 	return l
 }
