@@ -94,10 +94,12 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		// TODO: configurable time
 		conn.SetDeadline(time.Now().Add(time.Second))
 
+		// TODO: check for error
 		conn.Write(buf)
 
 		// get a response from the ping
 		retBuf := make([]byte, 2048)
+		// TODO: something with err
 		readRet, err := conn.Read(retBuf)
 
 		// Whether we got an ACK
@@ -126,6 +128,7 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		}
 		route.HandleACK(passed, time.Now().UnixNano()-p.PingTimeNS)
 		conn.Close()
+		// TODO: configurable ping sleep
 		time.Sleep(time.Second)
 	}
 }
