@@ -30,6 +30,9 @@ func Subscribe(p *PeerGraphMap) chan bool {
 		// defer a removal in case the peer disconnects (or blips)
 		defer p.cleanup()
 
+		// TODO: handle cases where we missed an event (update event will show up with no data
+		// in that case we should probably disconnect and reconnect-- assuming that
+		// we somehow missed the event
 		for {
 			select {
 			// handle errors-- all of these mean a disconnect/reconnect
@@ -39,7 +42,6 @@ func Subscribe(p *PeerGraphMap) chan bool {
 				// the new connection will re-seed on the new connection
 				p.cleanup()
 			case ev := <-stream.Events:
-				//logrus.Infof("Got Event: %v", ev.Event())
 				switch ev.Event() {
 
 				// Node events
@@ -105,8 +107,10 @@ func Subscribe(p *PeerGraphMap) chan bool {
 					}
 					route := p.Graph.GetRoute(r.Hops())
 
-					// TODO: some sort of "merge" method
-					route.State = r.State
+					if route != nil {
+						// TODO: some sort of "merge" method
+						route.State = r.State
+					}
 				case "removeRouteEvent":
 					r := graph.NetworkRoute{}
 					err := json.Unmarshal([]byte(ev.Data()), &r)
