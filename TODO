@@ -22,6 +22,8 @@ TODO:
             -- check ordering
     - separate the traceroute lib into a CLI + lib
     - Cleanup state serialization -- preferrably a string instead of a uint8 (up/suspect/down instead of 0/1/2)
+    - mapper:
+        - configurable dst port(s) for traceroute
 
 In the future:
     - support TCP pings
