@@ -167,7 +167,7 @@ func (g *NetworkGraph) DecrNode(name string) (*NetworkNode, bool) {
 		}
 		return n, true
 	}
-	return nil, false
+	return n, false
 }
 
 func (g *NetworkGraph) IncrLink(src, dst string, newLink *NetworkLink) (*NetworkLink, bool) {
@@ -238,7 +238,7 @@ func (g *NetworkGraph) DecrLink(src, dst string) (*NetworkLink, bool) {
 		}
 		return l, true
 	}
-	return nil, false
+	return l, false
 }
 
 func (g *NetworkGraph) pathKey(hops []string) string {
