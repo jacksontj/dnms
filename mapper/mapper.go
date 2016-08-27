@@ -137,7 +137,7 @@ func (m *Mapper) mapPeers() {
 			for peer := range peerChan {
 				m.mapPeer(peer, srcPort)
 				// TODO configurable rate
-				time.Sleep(time.Millisecond * 100)
+				time.Sleep(time.Second)
 			}
 		}
 	}
