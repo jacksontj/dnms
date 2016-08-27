@@ -23,6 +23,7 @@ TODO:
     - Cleanup state serialization -- preferrably a string instead of a uint8 (up/suspect/down instead of 0/1/2)
     - mapper:
         - configurable dst port(s) for traceroute
+    - include link latency from traceroutes in Link struct (requires refcounting, etc.)
 
 In the future:
     - support TCP pings
