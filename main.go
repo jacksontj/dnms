@@ -2,10 +2,9 @@ package main
 
 import (
 	"flag"
-	"time"
-
 	"net/http"
 	_ "net/http/pprof"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/jacksontj/dnms/aggregator"
