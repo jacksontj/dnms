@@ -54,12 +54,14 @@ func main() {
 		aggMap = aggregator.NewAggGraphMap()
 		api := aggregator.NewHTTPApi(aggMap)
 		api.Start(mux)
+	}
+
+	go http.ListenAndServe(":12345", mux)
+	if *aggNode {
 		// TODO: through something better than http, it is local after all
 		// subscribe to ourself
 		aggMap.AddPeer("127.0.0.1")
 	}
-
-	go http.ListenAndServe(":12345", mux)
 
 	// Wire up the delegate-- he'll handle pings and node up/down events
 	delegate := NewDNMSDelegate(m, aggMap)
