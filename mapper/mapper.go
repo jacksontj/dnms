@@ -37,6 +37,16 @@ type Mapper struct {
 	Graph *graph.NetworkGraph
 	// map of how to send a packet on each route
 	RouteMap *RouteMap
+
+	// Tunables. Zero values fall back to the defaults applied in Start().
+	// Interval is the pause between traceroutes inside a single src-port pass.
+	Interval time.Duration
+	// SrcPortStart/SrcPortEnd bound the source-port range used to elicit
+	// different ECMP paths via traceroute. Must NOT overlap with the ping
+	// transport's listen port — otherwise the pinger will EADDRINUSE when it
+	// tries to send from the colliding source port.
+	SrcPortStart int
+	SrcPortEnd   int
 }
 
 func NewMapper(ctx context.Context, n string) *Mapper {
@@ -115,6 +125,15 @@ func (m *Mapper) IterPeers() chan *Peer {
 
 // Start the mapping. The mapper exits when ctx is canceled.
 func (m *Mapper) Start(ctx context.Context) {
+	if m.Interval <= 0 {
+		m.Interval = time.Second
+	}
+	if m.SrcPortStart <= 0 {
+		m.SrcPortStart = 33436
+	}
+	if m.SrcPortEnd <= 0 {
+		m.SrcPortEnd = m.SrcPortStart + 10
+	}
 	go m.mapPeers(ctx)
 }
 
@@ -124,22 +143,17 @@ func (m *Mapper) Start(ctx context.Context) {
 // instead of depth first mapping
 func (m *Mapper) mapPeers(ctx context.Context) {
 	for {
-		// TODO: config
-		srcPortStart := 33435
-		srcPortEnd := 33445
-
-		for srcPort := srcPortStart; srcPort < srcPortEnd; srcPort++ {
+		for srcPort := m.SrcPortStart; srcPort < m.SrcPortEnd; srcPort++ {
 			peerChan := m.IterPeers()
 			for peer := range peerChan {
 				if ctx.Err() != nil {
 					return
 				}
 				m.mapPeer(peer, srcPort)
-				// TODO configurable rate
 				select {
 				case <-ctx.Done():
 					return
-				case <-time.After(time.Second):
+				case <-time.After(m.Interval):
 				}
 			}
 		}

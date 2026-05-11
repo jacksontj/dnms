@@ -24,10 +24,28 @@ type Pinger struct {
 	T *PingTransport
 
 	Self mapper.Peer
+
+	// Tunables. Zero values fall back to defaults applied in Start().
+	// PeerInterval is the pause between successive peers in a single sweep.
+	PeerInterval time.Duration
+	// RouteInterval is the pause between successive routes when pinging one
+	// peer (each peer has up to SrcPortEnd-SrcPortStart routes to cycle through).
+	RouteInterval time.Duration
+	// Timeout bounds how long we wait for an ack before declaring loss.
+	Timeout time.Duration
 }
 
 // Start begins pinging peers. The pinger exits when ctx is canceled.
 func (p *Pinger) Start(ctx context.Context) {
+	if p.PeerInterval <= 0 {
+		p.PeerInterval = 100 * time.Millisecond
+	}
+	if p.RouteInterval <= 0 {
+		p.RouteInterval = time.Second
+	}
+	if p.Timeout <= 0 {
+		p.Timeout = time.Second
+	}
 	go p.PingPeers(ctx)
 }
 
@@ -40,11 +58,10 @@ func (p *Pinger) PingPeers(ctx context.Context) {
 				return
 			}
 			p.PingPeer(ctx, peer)
-			// TODO configurable rate
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(100 * time.Millisecond):
+			case <-time.After(p.PeerInterval):
 			}
 		}
 	}
@@ -88,8 +105,7 @@ func (p *Pinger) PingPeer(ctx context.Context, peer *mapper.Peer) {
 			PingTimeNS: time.Now().UnixNano(),
 		}
 
-		// TODO: configurable timeout
-		_, rtt, err := p.T.SendPing(pkt, peer.Name, srcPort, time.Second)
+		_, rtt, err := p.T.SendPing(pkt, peer.Name, srcPort, p.Timeout)
 		passed := err == nil
 		if err != nil {
 			// EADDRINUSE just means another goroutine is using this source port
@@ -113,11 +129,10 @@ func (p *Pinger) PingPeer(ctx context.Context, peer *mapper.Peer) {
 		}
 		route.HandleACK(passed, latency)
 
-		// TODO: configurable ping sleep
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(time.Second):
+		case <-time.After(p.RouteInterval):
 		}
 	}
 }
