@@ -180,30 +180,104 @@ func (g *NetworkGraph) DecrNode(name string) (*NetworkNode, bool) {
 	return n, false
 }
 
-// RankLinksByLoss returns a flat snapshot of every link in the graph sorted by
-// lossRate descending — the bad hops surface first. Links with no samples are
-// included with 0 values so callers can distinguish "no data" from "no loss".
-func (g *NetworkGraph) RankLinksByLoss() []LinkHealth {
+// LinkAttribution is the per-link fault-attribution view produced by
+// AttributeLinkLoss. For a given link, we compare the loss rate of routes that
+// traverse it against the loss rate of routes that don't — a positive
+// Suspicion means routes through this link are losing more often than the
+// network-wide baseline, making it the prime suspect for a fault.
+type LinkAttribution struct {
+	Src              string  `json:"src"`
+	Dst              string  `json:"dst"`
+	RoutesThrough    int     `json:"routesThrough"`
+	RoutesNotThrough int     `json:"routesNotThrough"`
+	// Sample-weighted means so chatty routes count more than rarely-pinged ones.
+	AvgLossThrough    float64 `json:"avgLossThrough"`
+	AvgLossNotThrough float64 `json:"avgLossNotThrough"`
+	// Suspicion = AvgLossThrough - AvgLossNotThrough.
+	// Positive: this link is correlated with extra loss; rank descending.
+	Suspicion float64 `json:"suspicion"`
+}
+
+// AttributeLinkLoss correlates per-route loss observations with link
+// membership to identify which hops are likely causing loss. For each link L:
+//
+//	avgLossThrough    = sample-weighted mean lossRate of routes containing L
+//	avgLossNotThrough = sample-weighted mean lossRate of routes NOT containing L
+//	suspicion         = avgLossThrough - avgLossNotThrough
+//
+// A healthy link on a noisy path lands near zero (or negative); a genuinely
+// bad link surfaces with high suspicion because every route through it
+// shares its loss while routes avoiding it don't.
+//
+// Links with no traversing routes (or no samples on them) are returned with
+// zeroed fields so callers can still see "no data" entries.
+func (g *NetworkGraph) AttributeLinkLoss() []LinkAttribution {
+	// Snapshot routes + their summaries under the routes lock, then drop it
+	// before walking links — the links lock is taken inside IncrLink under
+	// the routes lock during IncrRoute, so we must not invert that order.
+	type routeStat struct {
+		route   *NetworkRoute
+		loss    float64
+		samples int
+	}
+	g.RoutesLock.RLock()
+	stats := make([]routeStat, 0, len(g.RoutesMap))
+	for _, r := range g.RoutesMap {
+		s := r.metrics.summary()
+		if s.NumPoints == 0 {
+			continue
+		}
+		stats = append(stats, routeStat{r, s.LossRate, s.NumPoints})
+	}
+	g.RoutesLock.RUnlock()
+
 	g.LinksLock.RLock()
-	out := make([]LinkHealth, 0, len(g.LinksMap))
+	out := make([]LinkAttribution, 0, len(g.LinksMap))
 	for _, l := range g.LinksMap {
-		s := l.Metrics()
-		out = append(out, LinkHealth{
-			Src:     l.SrcName,
-			Dst:     l.DstName,
-			Samples: s.NumPoints,
-			Loss:    s.LossRate,
-			AvgNs:   s.AverageLatencyNs,
-		})
+		var thruRoutes, notRoutes, thruSamples, notSamples int
+		var thruLossW, notLossW float64
+		for _, s := range stats {
+			traverses := false
+			for _, rl := range s.route.linkPath {
+				if rl == l {
+					traverses = true
+					break
+				}
+			}
+			if traverses {
+				thruRoutes++
+				thruSamples += s.samples
+				thruLossW += s.loss * float64(s.samples)
+			} else {
+				notRoutes++
+				notSamples += s.samples
+				notLossW += s.loss * float64(s.samples)
+			}
+		}
+		attr := LinkAttribution{
+			Src:              l.SrcName,
+			Dst:              l.DstName,
+			RoutesThrough:    thruRoutes,
+			RoutesNotThrough: notRoutes,
+		}
+		if thruSamples > 0 {
+			attr.AvgLossThrough = thruLossW / float64(thruSamples)
+		}
+		if notSamples > 0 {
+			attr.AvgLossNotThrough = notLossW / float64(notSamples)
+		}
+		attr.Suspicion = attr.AvgLossThrough - attr.AvgLossNotThrough
+		out = append(out, attr)
 	}
 	g.LinksLock.RUnlock()
+
 	sort.Slice(out, func(i, j int) bool {
-		// Primary: higher lossRate first. Tiebreak by sample count so links
-		// with more evidence rank ahead of newly-seen ones.
-		if out[i].Loss != out[j].Loss {
-			return out[i].Loss > out[j].Loss
+		// Primary: higher suspicion first. Tiebreak by # routes traversing
+		// (more evidence beats less).
+		if out[i].Suspicion != out[j].Suspicion {
+			return out[i].Suspicion > out[j].Suspicion
 		}
-		return out[i].Samples > out[j].Samples
+		return out[i].RoutesThrough > out[j].RoutesThrough
 	})
 	return out
 }

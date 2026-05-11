@@ -57,14 +57,7 @@ func (r *NetworkRoute) Key() string {
 }
 
 func (r *NetworkRoute) HandleACK(pass bool, latency int64) {
-	sample := PingSample{Pass: pass, Latency: latency}
-	r.metrics.record(sample)
-
-	// Fan out per-ack metrics to each link this route traverses, so we can
-	// later attribute loss/latency to individual hops.
-	for _, l := range r.linkPath {
-		l.recordSample(sample)
-	}
+	r.metrics.record(PingSample{Pass: pass, Latency: latency})
 
 	r.stateMu.Lock()
 	origState := r.State

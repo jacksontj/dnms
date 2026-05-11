@@ -123,7 +123,7 @@ func (h *HTTPApi) showEdges(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPApi) showEdgeHealth(w http.ResponseWriter, r *http.Request) {
-	ranked := h.m.Graph.RankLinksByLoss()
+	ranked := h.m.Graph.AttributeLinkLoss()
 	ret, err := json.Marshal(ranked)
 	if err != nil {
 		logrus.Errorf("Unable to marshal edge health: %v", err)
