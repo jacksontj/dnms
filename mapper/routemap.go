@@ -151,6 +151,7 @@ func (r *RouteMap) RemoveDst(dst string) []*graph.NetworkRoute {
 		ret = append(ret, v)
 		delete(r.NodeRouteMap, key)
 	}
+	delete(r.dstNodeMap, dst)
 	return ret
 }
 

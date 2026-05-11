@@ -72,7 +72,7 @@ func (p *PeerGraphMap) removeNode(n *graph.NetworkNode) {
 	p.nodesMap[node]--
 
 	if removed && p.nodesMap[node] != 0 {
-		logrus.Warningf("link removed from graph, even when we have %d refcounts to it!", p.nodesMap[node])
+		logrus.Warningf("node removed from graph, even when we have %d refcounts to it!", p.nodesMap[node])
 	}
 
 	if removed {
