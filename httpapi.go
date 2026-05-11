@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/jacksontj/dnms/graph"
 	"github.com/jacksontj/dnms/mapper"
 	"github.com/jacksontj/eventsource"

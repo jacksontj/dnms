@@ -6,7 +6,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // TODO: differentiate between peers and L3devices in the middle
