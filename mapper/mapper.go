@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jacksontj/dnms/graph"
 	"github.com/jacksontj/traceroute"
+	"github.com/sirupsen/logrus"
 )
 
 // TODO move elsewhere?
@@ -19,7 +19,7 @@ type Peer struct {
 }
 
 func (p *Peer) String() string {
-	return p.Name + ":" + strconv.Itoa(p.Port)
+	return net.JoinHostPort(p.Name, strconv.Itoa(p.Port))
 }
 
 // Responsible for maintaining a `NetworkGraph` by mapping the network at

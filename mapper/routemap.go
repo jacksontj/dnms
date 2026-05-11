@@ -3,12 +3,20 @@ package mapper
 // Map for port + node -> route
 import (
 	"encoding/json"
+	"net"
 	"strconv"
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jacksontj/dnms/graph"
+	"github.com/sirupsen/logrus"
 )
+
+// routeKey produces the canonical "src,dst" identifier used as a routemap key.
+// Both halves are host:port strings produced by net.JoinHostPort so IPv6
+// addresses round-trip safely.
+func routeKey(srcName string, srcPort int, dst string) string {
+	return net.JoinHostPort(srcName, strconv.Itoa(srcPort)) + "," + dst
+}
 
 // TODO: do our own route refcounting (up and down)
 type RouteMap struct {
@@ -110,7 +118,7 @@ func (r *RouteMap) removeNodeKey(dstKey, key string) {
 }
 
 func (r *RouteMap) GetRouteOption(srcName string, srcPort int, dstName string, dstPort int) *graph.NetworkRoute {
-	key := srcName + ":" + strconv.Itoa(srcPort) + "," + dstName + ":" + strconv.Itoa(dstPort)
+	key := routeKey(srcName, srcPort, net.JoinHostPort(dstName, strconv.Itoa(dstPort)))
 
 	r.lock.RLock()
 	defer r.lock.RUnlock()
@@ -120,7 +128,7 @@ func (r *RouteMap) GetRouteOption(srcName string, srcPort int, dstName string, d
 
 //
 func (r *RouteMap) UpdateRouteOption(srcName string, srcPort int, dst string, newRoute *graph.NetworkRoute) {
-	key := srcName + ":" + strconv.Itoa(srcPort) + "," + dst
+	key := routeKey(srcName, srcPort, dst)
 
 	r.lock.Lock()
 	defer r.lock.Unlock()
