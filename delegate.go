@@ -3,7 +3,7 @@ package main
 import (
 	"net"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/jacksontj/dnms/aggregator"
 	"github.com/jacksontj/dnms/mapper"
 	"github.com/jacksontj/memberlist"

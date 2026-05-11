@@ -24,6 +24,9 @@ _testmain.go
 *.test
 *.prof
 
+# Built binary
+/dnms
+
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
