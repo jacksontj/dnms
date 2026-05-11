@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>dnms</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="vendor/cytoscape.min.js"></script>
+</head>
+<body>
+    <header>
+        <div class="title">dnms</div>
+        <div class="counts">
+            <span><span class="label">peers</span><span id="cnt-peers">–</span></span>
+            <span><span class="label">nodes</span><span id="cnt-nodes">–</span></span>
+            <span><span class="label">links</span><span id="cnt-links">–</span></span>
+            <span><span class="label">routes</span><span id="cnt-routes">–</span></span>
+        </div>
+        <div class="controls">
+            <input id="search" type="search" placeholder="filter by name or DNS…" title="filter nodes by IP or DNS substring (case-insensitive)">
+            <div class="route-picker" title="highlight routes between two nodes">
+                <select id="route-start"><option value="">(start)</option></select>
+                <span class="arrow">→</span>
+                <select id="route-end"><option value="">(end)</option></select>
+                <button id="route-clear" title="clear route highlight">×</button>
+            </div>
+            <label class="toggle">
+                <input type="checkbox" id="view-aggregator">
+                <span>aggregator view</span>
+            </label>
+            <button id="auth-btn" title="manage bearer token">sign in</button>
+            <button id="refresh" title="refresh now">↻</button>
+        </div>
+    </header>
+    <main>
+        <div id="graph"></div>
+        <aside id="details" class="hidden">
+            <button class="close" id="details-close" title="close">×</button>
+            <div id="details-body"></div>
+        </aside>
+    </main>
+    <footer>
+        <span id="status">loading…</span>
+        <span id="error" class="hidden"></span>
+    </footer>
+    <script src="app.js"></script>
+</body>
+</html>
