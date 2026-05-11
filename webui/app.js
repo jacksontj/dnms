@@ -18,7 +18,13 @@
         graph: null,                 // last-loaded /graph payload, used by the route picker
         route: { start: "", end: "" },
         search: "",                  // node-name / DNS substring filter
+        history: new Map(),          // "src;dst" → ring of recent suspicion samples
+        focusedEdgeId: null,         // currently-shown edge in the details panel, if any
     };
+
+    // Sparkline history config. Polling cadence (5 s × 60 samples ≈ 5 min)
+    // is enough to spot recent fluctuations without unbounded memory growth.
+    const HISTORY_LIMIT = 60;
 
     // --- Bearer token auth -------------------------------------------------
     //
@@ -214,6 +220,7 @@
     }
 
     function showNodeDetails(node, graph) {
+        state.focusedEdgeId = null;
         const id = node.id();
         const data = node.data();
         const incidentEdges = node.connectedEdges();
@@ -234,7 +241,14 @@
 
     function showEdgeDetails(edge, graph) {
         const d = edge.data();
+        const key = `${d.source};${d.target}`;
+        state.focusedEdgeId = edge.id();
         const routes = routesThroughLink(graph, d.source, d.target);
+        const spark = sparklineSVG(key);
+        const buf = state.history.get(key) || [];
+        const sparkHTML = spark
+            ? `<div class="spark-wrap">${spark}<div class="spark-caption">suspicion · last ${buf.length} sample${buf.length === 1 ? "" : "s"} (5s cadence)</div></div>`
+            : `<div class="spark-caption" style="color:var(--muted)">(no samples yet)</div>`;
         const html = `
             <h2>Link ${escape(d.source)} → ${escape(d.target)}</h2>
             <dl>
@@ -243,6 +257,8 @@
                 <dt>avg loss (routes not through)</dt><dd>${formatPercent(d.lossNot)}</dd>
                 <dt>routes through</dt><dd>${d.routesThrough}</dd>
             </dl>
+            <h3>Recent suspicion</h3>
+            ${sparkHTML}
             <h3>Routes through this link (${routes.length})</h3>
             <ul>
                 ${routes.map(r => `<li>${escape(r.summary)} <span style="color:var(--muted)">(loss ${formatPercent(r.lossRate)}, ${r.numPoints} samples)</span></li>`).join("") || "<li><span style='color:var(--muted)'>(none with samples)</span></li>"}
@@ -275,6 +291,7 @@
     }
     function hideDetails() {
         $("#details").classList.add("hidden");
+        state.focusedEdgeId = null;
     }
 
     function escape(s) {
@@ -477,7 +494,11 @@
         try {
             const health = await fetchJSON(basePath() + "/graph/edges/health");
             const byKey = {};
-            for (const h of health) byKey[`${h.src};${h.dst}`] = h;
+            const sampledAt = Date.now();
+            for (const h of health) {
+                byKey[`${h.src};${h.dst}`] = h;
+                pushHistory(`${h.src};${h.dst}`, sampledAt, h.suspicion);
+            }
             state.cy.edges().forEach((e) => {
                 const key = `${e.data("source")};${e.data("target")}`;
                 const h = byKey[key];
@@ -489,10 +510,56 @@
                     e.data("color", suspicionColor(h.suspicion));
                 }
             });
+            // If the user is looking at a link's details right now, refresh
+            // its panel — the sparkline just got a new sample.
+            if (state.focusedEdgeId) {
+                const edge = state.cy.getElementById(state.focusedEdgeId);
+                if (edge && edge.length) showEdgeDetails(edge, state.graph);
+            }
             setStatus(`health refreshed @ ${new Date().toLocaleTimeString()}`);
         } catch (err) {
             setError(err.message);
         }
+    }
+
+    function pushHistory(key, t, suspicion) {
+        let buf = state.history.get(key);
+        if (!buf) {
+            buf = [];
+            state.history.set(key, buf);
+        }
+        buf.push({ t, s: suspicion });
+        if (buf.length > HISTORY_LIMIT) buf.splice(0, buf.length - HISTORY_LIMIT);
+    }
+
+    // sparklineSVG returns an SVG string plotting the last N suspicion
+    // samples for the given link key. Returns "" if no samples yet (so the
+    // panel can render a friendly placeholder).
+    function sparklineSVG(key) {
+        const buf = state.history.get(key);
+        if (!buf || buf.length === 0) return "";
+        const W = 240, H = 44, PAD = 2;
+        // Y range: clamp to [-0.2, 1] so most suspicion values land in a
+        // stable band. The zero line stays in roughly the same spot.
+        const yMin = -0.2, yMax = 1.0;
+        const yToPx = (v) => {
+            const clamped = Math.max(yMin, Math.min(yMax, v));
+            return PAD + (H - 2 * PAD) * (1 - (clamped - yMin) / (yMax - yMin));
+        };
+        const xToPx = (i) => {
+            if (buf.length === 1) return W / 2;
+            return PAD + (W - 2 * PAD) * (i / (buf.length - 1));
+        };
+        const pts = buf.map((p, i) => `${xToPx(i).toFixed(1)},${yToPx(p.s).toFixed(1)}`).join(" ");
+        const last = buf[buf.length - 1].s;
+        const lineColor = suspicionColor(last);
+        const zeroY = yToPx(0).toFixed(1);
+        return `
+            <svg class="spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+                <line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+                <polyline fill="none" stroke="${lineColor}" stroke-width="1.5" points="${pts}"/>
+            </svg>
+        `;
     }
 
     function updateCounts(graph) {
@@ -532,6 +599,10 @@
 
     function switchView() {
         state.aggregator = $("#view-aggregator").checked;
+        // History was accumulated against the previous data source; throw it
+        // out so the sparklines don't mix mapper and aggregator measurements.
+        state.history.clear();
+        hideDetails();
         loadAll();
         startSSE();
     }

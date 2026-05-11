@@ -155,6 +155,18 @@ main {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+#details .spark-wrap {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px;
+}
+#details .spark { display: block; width: 100%; height: auto; }
+#details .spark-caption {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 11px;
+}
 
 footer {
     padding: 6px 16px;
