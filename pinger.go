@@ -21,6 +21,7 @@ func isAddrInUse(err error) bool {
 
 type Pinger struct {
 	M *mapper.Mapper
+	T *PingTransport
 
 	Self mapper.Peer
 }
@@ -86,77 +87,32 @@ func (p *Pinger) PingPeer(ctx context.Context, peer *mapper.Peer) {
 			Path:       route.Hops(),
 			PingTimeNS: time.Now().UnixNano(),
 		}
-		// TODO: major cleanup to encapsulate all this message sending
-		// Encode as a user message
-		encodedBuf, err := encode(pingMsg, pkt)
-		if err != nil {
-			logrus.Infof("Unable to encode pingMsg: %v", err)
-			continue
-		}
-		msg := encodedBuf.Bytes()
-		buf := make([]byte, 1, len(msg)+1)
-		buf[0] = byte(8) // TODO: add sendFrom API to memberlist
-		buf = append(buf, msg...)
 
-		localAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("0.0.0.0", srcPortStr))
+		// TODO: configurable timeout
+		_, rtt, err := p.T.SendPing(pkt, peer.Name, srcPort, time.Second)
+		passed := err == nil
 		if err != nil {
-			logrus.Errorf("unable to resolve source addr: %v", err)
-			continue
-		}
-		remoteEP := net.UDPAddr{
-			IP:   net.ParseIP(peer.Name), // TODO: have ip field
-			Port: peer.Port,
-		}
-		conn, err := net.DialUDP("udp", localAddr, &remoteEP)
-		if err != nil {
-			// EADDRINUSE happens when another goroutine is already bound to
-			// this source port (or recently was); log at debug since the next
-			// iteration retries with a different source port. Anything else
-			// is a real error.
+			// EADDRINUSE just means another goroutine is using this source port
+			// right now; the loop will retry on the next pass. Anything else
+			// (including timeout) is treated as a missed ack — the route's
+			// HandleACK will record that as a sample.
 			if isAddrInUse(err) {
-				logrus.Debugf("source port %d in use, will retry: %v", srcPort, err)
+				logrus.Debugf("source port %d in use, skipping: %v", srcPort, err)
 			} else {
-				logrus.Errorf("unable to connect to peer: %v", err)
-			}
-			continue
-		}
-		// TODO: configurable time
-		conn.SetDeadline(time.Now().Add(time.Second))
-
-		// TODO: check for error
-		conn.Write(buf)
-
-		// get a response from the ping
-		retBuf := make([]byte, 2048)
-		// TODO: something with err
-		readRet, _ := conn.Read(retBuf)
-
-		// Whether we got an ACK
-		passed := false
-
-		// if there was a response
-		if readRet > 0 {
-			// Note: throwing away the first byte-- as its the memberlist header
-			msgType := messageType(retBuf[1])
-			retBuf = retBuf[2:]
-
-			switch msgType {
-
-			case ackMsg:
-				a := ack{}
-				err := decode(retBuf, &a)
-				if err != nil {
-					logrus.Warningf("Unable to decode message: %v", err)
-				} else {
-					passed = true
-				}
-
-			default:
-				logrus.Infof("Got unknown response type from ack: %v", msgType)
+				logrus.Debugf("ping %s -> %s failed: %v", srcEnd, peer.String(), err)
 			}
 		}
-		route.HandleACK(passed, time.Now().UnixNano()-pkt.PingTimeNS)
-		conn.Close()
+
+		var latency int64
+		if passed {
+			latency = int64(rtt)
+		} else {
+			// Use the elapsed wall time as a coarse "latency" sample so the
+			// ring keeps pace; downstream code differentiates pass vs. fail.
+			latency = time.Now().UnixNano() - pkt.PingTimeNS
+		}
+		route.HandleACK(passed, latency)
+
 		// TODO: configurable ping sleep
 		select {
 		case <-ctx.Done():

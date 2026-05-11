@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net"
 	"sync/atomic"
 
 	"github.com/jacksontj/dnms/aggregator"
@@ -46,53 +45,14 @@ func (d *DNMSDelegate) NodeMeta(limit int) []byte {
 	return nil
 }
 
-// NotifyMsg is called when a user-data message is received.
-// Care should be taken that this method does not block, since doing
-// so would block the entire UDP packet receive loop. Additionally, the byte
-// slice may be modified after the call returns, so it should be copied if needed.
+// NotifyMsg is called when a user-data message is received via memberlist.
+// Ping/ack used to be carried here; now they have their own UDP transport,
+// so this is a no-op left in place for any future memberlist user messages.
 func (d *DNMSDelegate) NotifyMsg(buf []byte) {
-	msgType := messageType(buf[0])
-	buf = buf[1:]
-
-	switch msgType {
-
-	case pingMsg:
-		p := ping{}
-		err := decode(buf, &p)
-		if err != nil {
-			logrus.Warningf("Unable to decode message: %v", err)
-			return
-		}
-
-		a := ack{
-			PingTimeNS: p.PingTimeNS,
-		}
-
-		// Encode as a user message
-		encodedBuf, err := encode(ackMsg, a)
-		if err != nil {
-			logrus.Infof("Unable to encode pingMsg: %v", err)
-			return
-		}
-
-		mlist := d.Mlist()
-		if mlist == nil {
-			// Memberlist isn't fully initialized yet — drop the ack rather
-			// than nil-deref. The peer will retry.
-			return
-		}
-		mlist.SendToUDPPort(
-			&net.UDPAddr{
-				IP:   net.ParseIP(p.SrcName),
-				Port: p.SrcPort,
-			},
-			encodedBuf.Bytes(),
-		)
-	default:
-		logrus.Infof("Unknown messageType=%d", msgType)
-
+	if len(buf) == 0 {
+		return
 	}
-
+	logrus.Debugf("ignoring memberlist user msg type=%d (no handler)", buf[0])
 }
 
 // GetBroadcasts is called when user data messages can be broadcast.
