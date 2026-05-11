@@ -2,11 +2,12 @@ package main
 
 import (
 	"net"
+	"sync/atomic"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jacksontj/dnms/aggregator"
 	"github.com/jacksontj/dnms/mapper"
 	"github.com/jacksontj/memberlist"
+	"github.com/sirupsen/logrus"
 )
 
 type DNMSDelegate struct {
@@ -16,7 +17,11 @@ type DNMSDelegate struct {
 	// for aggregation
 	AggMap *aggregator.AggGraphMap
 
-	Mlist *memberlist.Memberlist
+	// memberlist.Create can fire NotifyMsg/NotifyJoin during construction —
+	// before the caller has a chance to wire up the *Memberlist value — so we
+	// store it atomically and let those callbacks observe nil safely until
+	// SetMlist is called.
+	mlist atomic.Pointer[memberlist.Memberlist]
 }
 
 func NewDNMSDelegate(m *mapper.Mapper, a *aggregator.AggGraphMap) *DNMSDelegate {
@@ -24,6 +29,14 @@ func NewDNMSDelegate(m *mapper.Mapper, a *aggregator.AggGraphMap) *DNMSDelegate 
 		Mapper: m,
 		AggMap: a,
 	}
+}
+
+func (d *DNMSDelegate) SetMlist(m *memberlist.Memberlist) {
+	d.mlist.Store(m)
+}
+
+func (d *DNMSDelegate) Mlist() *memberlist.Memberlist {
+	return d.mlist.Load()
 }
 
 // NodeMeta is used to retrieve meta-data about the current node
@@ -62,7 +75,13 @@ func (d *DNMSDelegate) NotifyMsg(buf []byte) {
 			return
 		}
 
-		d.Mlist.SendToUDPPort(
+		mlist := d.Mlist()
+		if mlist == nil {
+			// Memberlist isn't fully initialized yet — drop the ack rather
+			// than nil-deref. The peer will retry.
+			return
+		}
+		mlist.SendToUDPPort(
 			&net.UDPAddr{
 				IP:   net.ParseIP(p.SrcName),
 				Port: p.SrcPort,
@@ -106,8 +125,8 @@ func (d *DNMSDelegate) MergeRemoteState(buf []byte, join bool) {
 // NotifyJoin is invoked when a node is detected to have joined.
 // The Node argument must not be modified.
 func (d *DNMSDelegate) NotifyJoin(n *memberlist.Node) {
-	// Workaround startup chicken and egg problem
-	if d.Mlist == nil {
+	// Memberlist may fire NotifyJoin before SetMlist has been called.
+	if d.Mlist() == nil {
 		return
 	}
 	logrus.Infof("Node joined %s", n.Addr.String())

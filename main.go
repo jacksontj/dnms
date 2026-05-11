@@ -68,10 +68,10 @@ func main() {
 
 	// Create the memberlist with the config we just made
 	mlist, err := memberlist.Create(cfg)
-	delegate.Mlist = mlist
 	if err != nil {
 		logrus.Fatalf("Unable to create memberlist: %v", err)
 	}
+	delegate.SetMlist(mlist)
 
 	// TODO: background thing to join if we end up alone?
 	// or if people disconnect
