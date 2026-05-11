@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jacksontj/dnms/mapper"
+	"github.com/sirupsen/logrus"
 )
 
 // TODO: move to another package??
@@ -48,10 +48,22 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		if route == nil {
 			continue
 		}
-		routeKeyParts := strings.SplitN(routeKey, ",", 2)
-		srcKeyParts := strings.SplitN(routeKeyParts[0], ":", 2)
-		srcPort, _ := strconv.Atoi(srcKeyParts[1])
-		logrus.Debugf("Ping src=%s dst=%s", routeKeyParts[0], routeKeyParts[1])
+		srcEnd, dstEnd, ok := strings.Cut(routeKey, ",")
+		if !ok {
+			logrus.Warningf("malformed route key (no comma): %q", routeKey)
+			continue
+		}
+		_, srcPortStr, err := net.SplitHostPort(srcEnd)
+		if err != nil {
+			logrus.Warningf("malformed route key src %q: %v", srcEnd, err)
+			continue
+		}
+		srcPort, err := strconv.Atoi(srcPortStr)
+		if err != nil {
+			logrus.Warningf("malformed src port in route key %q: %v", srcEnd, err)
+			continue
+		}
+		logrus.Debugf("Ping src=%s dst=%s", srcEnd, dstEnd)
 
 		p := ping{
 			SrcName:    p.Self.Name,
@@ -73,7 +85,7 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		buf[0] = byte(8) // TODO: add sendFrom API to memberlist
 		buf = append(buf, msg...)
 
-		LocalAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:"+srcKeyParts[1])
+		LocalAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("0.0.0.0", srcPortStr))
 		if err != nil {
 			logrus.Errorf("unable to resolve source addr %v", err)
 		}
