@@ -1,16 +1,19 @@
 package aggregator
 
 import (
+	"context"
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jacksontj/dnms/graph"
+	"github.com/sirupsen/logrus"
 )
 
 // This is an aggregated graph of the cluster
 // peerMap is a mapping of peerName -> peergraphmap (which keeps track of what
 // items in the graph where due to the given peer)
 type AggGraphMap struct {
+	ctx context.Context
+
 	// map of peer -> routes -> ourRefcount
 	peerMap map[string]*PeerGraphMap
 	mapLock *sync.RWMutex
@@ -18,11 +21,12 @@ type AggGraphMap struct {
 	Graph *graph.NetworkGraph
 }
 
-func NewAggGraphMap() *AggGraphMap {
+func NewAggGraphMap(ctx context.Context) *AggGraphMap {
 	return &AggGraphMap{
+		ctx:     ctx,
 		peerMap: make(map[string]*PeerGraphMap),
 		mapLock: &sync.RWMutex{},
-		Graph:   graph.Create(),
+		Graph:   graph.Create(ctx),
 	}
 }
 
@@ -31,7 +35,7 @@ func (p *AggGraphMap) AddPeer(peer string) {
 	defer p.mapLock.Unlock()
 	_, ok := p.peerMap[peer]
 	if !ok {
-		p.peerMap[peer] = NewPeerGraphMap(peer, p.Graph)
+		p.peerMap[peer] = NewPeerGraphMap(p.ctx, peer, p.Graph)
 	}
 }
 

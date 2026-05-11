@@ -3,6 +3,7 @@ package graph
 
 import (
 	"container/ring"
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"io"
@@ -29,7 +30,10 @@ type NetworkGraph struct {
 	internalEvents    chan *Event
 }
 
-func Create() *NetworkGraph {
+// Create constructs a NetworkGraph and starts the publisher goroutine.
+// The publisher exits when ctx is canceled. Pass context.Background() if
+// the graph should outlive any one request scope (e.g. process lifetime).
+func Create(ctx context.Context) *NetworkGraph {
 	g := &NetworkGraph{
 		NodesMap:   make(map[string]*NetworkNode),
 		NodesLock:  &sync.RWMutex{},
@@ -43,16 +47,22 @@ func Create() *NetworkGraph {
 		internalEvents:    make(chan *Event),
 	}
 
-	go g.publisher()
+	go g.publisher(ctx)
 
 	return g
 }
 
 // TODO: buffer messages?
 // goroutine target to do all the publishing of events
-func (g *NetworkGraph) publisher() {
+func (g *NetworkGraph) publisher(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			for c := range g.eventChannels {
+				delete(g.eventChannels, c)
+				close(c)
+			}
+			return
 		case newChannel := <-g.eventRegistration:
 			g.eventChannels[newChannel] = true
 		case newEvent := <-g.internalEvents:

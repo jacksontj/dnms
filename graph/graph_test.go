@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -47,7 +48,7 @@ func validateGraph(t *testing.T, g *NetworkGraph, expectedNodes map[string]int, 
 }
 
 func TestNodes(t *testing.T) {
-	g := Create()
+	g := Create(context.Background())
 
 	expectedNodes := map[string]int{
 		"192.168.1.1": 2,
@@ -64,7 +65,7 @@ func TestNodes(t *testing.T) {
 }
 
 func TestLinks(t *testing.T) {
-	g := Create()
+	g := Create(context.Background())
 
 	expectedLinks := map[string]int{
 		"192.168.1.1;192.168.1.2": 2,
@@ -94,7 +95,7 @@ type RouteTestSpec struct {
 }
 
 func TestRoutes(t *testing.T) {
-	g := Create()
+	g := Create(context.Background())
 	expectedRoutes := []RouteTestSpec{
 		RouteTestSpec{
 			Count: 1,

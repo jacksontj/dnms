@@ -1,13 +1,14 @@
 package aggregator
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jacksontj/dnms/graph"
 	"github.com/jacksontj/dnms/mapper"
 	"github.com/jacksontj/eventsource"
+	"github.com/sirupsen/logrus"
 )
 
 type HTTPApi struct {
@@ -28,7 +29,7 @@ func NewHTTPApi(p *AggGraphMap) *HTTPApi {
 	return api
 }
 
-func (h *HTTPApi) Start(mux *http.ServeMux) {
+func (h *HTTPApi) Start(ctx context.Context, mux *http.ServeMux) {
 	// TODO: think more about the namespacing of this API. Most thing belong to "mapper"
 	// but probably want to separate by "topology" "routing" or something like that
 
@@ -42,26 +43,29 @@ func (h *HTTPApi) Start(mux *http.ServeMux) {
 
 	// event endpoint
 	mux.HandleFunc("/v1/aggregator/events/graph", h.eventStreamGraph)
-	// Create event listener to pull events from mapper and push into eventBroker
-	go func() {
-		for {
-			// TODO: configurable buffer size?
-			c := make(chan *graph.Event, 100)
-			// subscriber
-			h.p.Graph.Subscribe(c)
+	go h.republishGraphEvents(ctx)
+}
 
-			for {
-				event, closed := <-c
-				// TODO: something to catch up? we'll have dropped events at least :/
-				if !closed {
-					logrus.Infof("Graph subscriber channel was closed, we might drop some messages")
-					break
+func (h *HTTPApi) republishGraphEvents(ctx context.Context) {
+	for ctx.Err() == nil {
+		// TODO: configurable buffer size?
+		c := make(chan *graph.Event, 100)
+		h.p.Graph.Subscribe(c)
+		drained := false
+		for !drained {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-c:
+				if !ok {
+					logrus.Infof("Graph subscriber channel was closed, resubscribing")
+					drained = true
+					continue
 				}
 				h.eventBroker.Publish([]string{"mapper"}, event)
 			}
 		}
-
-	}()
+	}
 }
 
 // TODO: better, terrible things are here

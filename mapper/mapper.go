@@ -1,6 +1,7 @@
 package mapper
 
 import (
+	"context"
 	"net"
 	"strconv"
 	"sync"
@@ -38,11 +39,11 @@ type Mapper struct {
 	RouteMap *RouteMap
 }
 
-func NewMapper(n string) *Mapper {
+func NewMapper(ctx context.Context, n string) *Mapper {
 	m := &Mapper{
 		localName: n,
 		peerMap:   make(map[string]*Peer),
-		Graph:     graph.Create(),
+		Graph:     graph.Create(ctx),
 		RouteMap:  NewRouteMap(),
 		peerLock:  &sync.RWMutex{},
 	}
@@ -112,21 +113,16 @@ func (m *Mapper) IterPeers() chan *Peer {
 	return peerChan
 }
 
-// Start the mapping
-func (m *Mapper) Start() {
-	go m.mapPeers()
-}
-
-// TODO implement stopping
-func (m *Mapper) Stop() {
-
+// Start the mapping. The mapper exits when ctx is canceled.
+func (m *Mapper) Start(ctx context.Context) {
+	go m.mapPeers(ctx)
 }
 
 // TODO: parallelize the individual peer mapping
 // Target for background goroutine responsible for doing the actual mapping
 // We specifically map all peers on a given port to effectively get breadth first
 // instead of depth first mapping
-func (m *Mapper) mapPeers() {
+func (m *Mapper) mapPeers(ctx context.Context) {
 	for {
 		// TODO: config
 		srcPortStart := 33435
@@ -135,9 +131,16 @@ func (m *Mapper) mapPeers() {
 		for srcPort := srcPortStart; srcPort < srcPortEnd; srcPort++ {
 			peerChan := m.IterPeers()
 			for peer := range peerChan {
+				if ctx.Err() != nil {
+					return
+				}
 				m.mapPeer(peer, srcPort)
 				// TODO configurable rate
-				time.Sleep(time.Second)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second):
+				}
 			}
 		}
 	}
