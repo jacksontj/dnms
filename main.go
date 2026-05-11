@@ -12,7 +12,7 @@ import (
 
 	"github.com/jacksontj/dnms/aggregator"
 	"github.com/jacksontj/dnms/mapper"
-	"github.com/jacksontj/memberlist"
+	"github.com/hashicorp/memberlist"
 	"github.com/sirupsen/logrus"
 )
 
