@@ -1,14 +1,20 @@
 package main
 
 import (
+	"errors"
 	"net"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/jacksontj/dnms/mapper"
 	"github.com/sirupsen/logrus"
 )
+
+func isAddrInUse(err error) bool {
+	return errors.Is(err, syscall.EADDRINUSE)
+}
 
 // TODO: move to another package??
 
@@ -65,7 +71,7 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		}
 		logrus.Debugf("Ping src=%s dst=%s", srcEnd, dstEnd)
 
-		p := ping{
+		pkt := ping{
 			SrcName:    p.Self.Name,
 			SrcPort:    srcPort,
 			DstName:    peer.Name,
@@ -75,7 +81,7 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		}
 		// TODO: major cleanup to encapsulate all this message sending
 		// Encode as a user message
-		encodedBuf, err := encode(pingMsg, p)
+		encodedBuf, err := encode(pingMsg, pkt)
 		if err != nil {
 			logrus.Infof("Unable to encode pingMsg: %v", err)
 			continue
@@ -85,21 +91,25 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		buf[0] = byte(8) // TODO: add sendFrom API to memberlist
 		buf = append(buf, msg...)
 
-		LocalAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("0.0.0.0", srcPortStr))
+		localAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("0.0.0.0", srcPortStr))
 		if err != nil {
-			logrus.Errorf("unable to resolve source addr %v", err)
+			logrus.Errorf("unable to resolve source addr: %v", err)
+			continue
 		}
-		RemoteEP := net.UDPAddr{
+		remoteEP := net.UDPAddr{
 			IP:   net.ParseIP(peer.Name), // TODO: have ip field
 			Port: peer.Port,
 		}
-		conn, err := net.DialUDP("udp", LocalAddr, &RemoteEP)
+		conn, err := net.DialUDP("udp", localAddr, &remoteEP)
 		if err != nil {
-			// If we got a non-retryable error, lets log it
-			if netErr, ok := err.(net.Error); !(ok && netErr.Temporary()) {
-				logrus.Errorf("unable to connect to peer: %v", err)
+			// EADDRINUSE happens when another goroutine is already bound to
+			// this source port (or recently was); log at debug since the next
+			// iteration retries with a different source port. Anything else
+			// is a real error.
+			if isAddrInUse(err) {
+				logrus.Debugf("source port %d in use, will retry: %v", srcPort, err)
 			} else {
-				logrus.Debugf("Temporarily unable to connect to peer: %v", err)
+				logrus.Errorf("unable to connect to peer: %v", err)
 			}
 			continue
 		}
@@ -112,7 +122,7 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		// get a response from the ping
 		retBuf := make([]byte, 2048)
 		// TODO: something with err
-		readRet, err := conn.Read(retBuf)
+		readRet, _ := conn.Read(retBuf)
 
 		// Whether we got an ACK
 		passed := false
@@ -138,7 +148,7 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 				logrus.Infof("Got unknown response type from ack: %v", msgType)
 			}
 		}
-		route.HandleACK(passed, time.Now().UnixNano()-p.PingTimeNS)
+		route.HandleACK(passed, time.Now().UnixNano()-pkt.PingTimeNS)
 		conn.Close()
 		// TODO: configurable ping sleep
 		time.Sleep(time.Second)
