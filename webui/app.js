@@ -17,8 +17,37 @@
         healthTimer: null,           // poll timer for edges/health
     };
 
+    // --- Bearer token auth -------------------------------------------------
+    //
+    // The server may run with -httpToken set, in which case every API request
+    // needs an Authorization header (or a ?token= query param for SSE, since
+    // browser EventSource can't send custom headers). We stash the token in
+    // localStorage so it survives reload, prompt on first 401, and clear it
+    // if a retry also 401s.
+
+    const TOKEN_KEY = "dnms.token";
+    const auth = {
+        get: () => localStorage.getItem(TOKEN_KEY) || "",
+        set: (t) => localStorage.setItem(TOKEN_KEY, t),
+        clear: () => localStorage.removeItem(TOKEN_KEY),
+    };
+
     function basePath() {
         return state.aggregator ? "/v1/aggregator" : "/v1";
+    }
+
+    function withTokenQuery(url) {
+        const t = auth.get();
+        if (!t) return url;
+        const sep = url.includes("?") ? "&" : "?";
+        return url + sep + "token=" + encodeURIComponent(t);
+    }
+
+    function api(path, opts = {}) {
+        const t = auth.get();
+        const headers = Object.assign({}, opts.headers || {});
+        if (t) headers["Authorization"] = "Bearer " + t;
+        return fetch(path, Object.assign({}, opts, { headers }));
     }
 
     function setStatus(msg) { $("#status").textContent = msg; }
@@ -29,8 +58,40 @@
         el.textContent = msg;
     }
 
+    function promptForToken(reason) {
+        const current = auth.get();
+        const msg = (reason ? reason + "\n\n" : "")
+            + "The server is running with -httpToken set. Paste the token "
+            + "to authorize this browser. Cancel to clear any stored token.";
+        const next = window.prompt(msg, current);
+        if (next === null) { auth.clear(); return false; }
+        const trimmed = next.trim();
+        if (!trimmed) { auth.clear(); return false; }
+        auth.set(trimmed);
+        return true;
+    }
+
+    function updateAuthButton() {
+        const btn = $("#auth-btn");
+        if (!btn) return;
+        btn.textContent = auth.get() ? "sign out" : "sign in";
+    }
+
     async function fetchJSON(path) {
-        const r = await fetch(path);
+        let r = await api(path);
+        if (r.status === 401) {
+            // Prompt for token, then retry once.
+            const ok = promptForToken("Server returned 401 Unauthorized.");
+            updateAuthButton();
+            if (!ok) throw new Error(`${path}: HTTP 401 (no token)`);
+            r = await api(path);
+            if (r.status === 401) {
+                // Wrong token; clear it so the next page load reprompts.
+                auth.clear();
+                updateAuthButton();
+                throw new Error(`${path}: HTTP 401 (token rejected)`);
+            }
+        }
         if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
         return r.json();
     }
@@ -243,8 +304,10 @@
         $("#cnt-nodes").textContent = Object.keys(graph.nodes || {}).length;
         $("#cnt-links").textContent = Object.keys(graph.edges || {}).length;
         $("#cnt-routes").textContent = Object.keys(graph.routes || {}).length;
-        // peers count isn't in /graph; fetch separately, best effort
-        fetch(basePath().replace("/aggregator", "") + "/mapper/peers")
+        // peers count isn't in /graph; fetch separately, best effort.
+        // Always hits the mapper-side endpoint (the aggregator doesn't expose
+        // its own peers list — that's a node-local concept).
+        api("/v1/mapper/peers")
             .then(r => r.ok ? r.json() : [])
             .then(peers => { $("#cnt-peers").textContent = peers.length; })
             .catch(() => { $("#cnt-peers").textContent = "–"; });
@@ -252,8 +315,10 @@
 
     function startSSE() {
         if (state.eventSource) { state.eventSource.close(); state.eventSource = null; }
-        const url = basePath() + "/events/graph";
         if (!window.EventSource) return;
+        // EventSource can't send headers, so we pass the token (if any) as a
+        // query parameter — the server's HTTPSecurity middleware accepts both.
+        const url = withTokenQuery(basePath() + "/events/graph");
         const es = new EventSource(url);
         // Live mutation events: just trigger a full reload. Cheap, keeps the
         // graph in sync without us reimplementing the diff logic per-event.
@@ -276,10 +341,29 @@
         startSSE();
     }
 
+    function onAuthClick() {
+        if (auth.get()) {
+            auth.clear();
+            updateAuthButton();
+            setStatus("token cleared; subsequent requests will be unauthenticated");
+            // Force a reload so any cached EventSource reconnects without the token.
+            startSSE();
+            loadAll();
+            return;
+        }
+        if (promptForToken()) {
+            updateAuthButton();
+            startSSE();
+            loadAll();
+        }
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
         $("#view-aggregator").addEventListener("change", switchView);
         $("#refresh").addEventListener("click", loadAll);
         $("#details-close").addEventListener("click", hideDetails);
+        $("#auth-btn").addEventListener("click", onAuthClick);
+        updateAuthButton();
         loadAll();
         startSSE();
         startHealthPolling();

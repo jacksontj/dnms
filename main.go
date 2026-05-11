@@ -105,7 +105,14 @@ func main() {
 		aggMap.AddPeer("127.0.0.1")
 	}
 
-	sec := HTTPSecurity{AllowOrigin: *httpAllowOrigin, Token: *httpToken}
+	// Only gate the JSON API behind the token, not the static dashboard. The
+	// JS itself isn't sensitive (it's the same code the operator can browse
+	// directly) and must load before it can prompt the user for a token.
+	sec := HTTPSecurity{
+		AllowOrigin:       *httpAllowOrigin,
+		Token:             *httpToken,
+		ProtectedPrefixes: []string{"/v1/"},
+	}
 	srv := &http.Server{Addr: *httpAddr, Handler: sec.Wrap(mux)}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

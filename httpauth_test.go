@@ -80,6 +80,41 @@ func TestHTTPSecurityTokenRequiredAcceptsValidToken(t *testing.T) {
 	}
 }
 
+// EventSource in the browser can't send custom headers, so the middleware
+// also accepts the token via a ?token= query param. The behavior is
+// symmetric: same valid token → 200, anything else → 401.
+func TestHTTPSecurityTokenRequiredAcceptsQueryParam(t *testing.T) {
+	fh := &fakeHandler{}
+	h := HTTPSecurity{Token: "s3cret"}.Wrap(fh)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/v1/events/graph?token=s3cret", nil)
+	h.ServeHTTP(rec, req)
+
+	if !fh.called {
+		t.Errorf("inner handler should have been called with valid token query param")
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestHTTPSecurityTokenRequiredRejectsWrongQueryParam(t *testing.T) {
+	fh := &fakeHandler{}
+	h := HTTPSecurity{Token: "s3cret"}.Wrap(fh)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/v1/events/graph?token=wrong", nil)
+	h.ServeHTTP(rec, req)
+
+	if fh.called {
+		t.Errorf("inner handler should not have been called with wrong token query param")
+	}
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
+	}
+}
+
 // CORS preflight should be honored without requiring auth, otherwise browsers
 // can't even discover that the endpoint exists.
 func TestHTTPSecurityPreflightSkipsAuth(t *testing.T) {
@@ -101,6 +136,38 @@ func TestHTTPSecurityPreflightSkipsAuth(t *testing.T) {
 	}
 	if rec.Header().Get("Access-Control-Allow-Methods") == "" {
 		t.Errorf("preflight should advertise allowed methods")
+	}
+}
+
+// When the security wrapper is configured with protected prefixes, paths
+// outside the prefix list serve without auth even when a token is set. This
+// is what makes the static UI loadable so the JS can later prompt for a
+// token to talk to /v1/*.
+func TestHTTPSecurityProtectedPrefixOnlyGatesMatchingPaths(t *testing.T) {
+	fh := &fakeHandler{}
+	h := HTTPSecurity{Token: "s3cret", ProtectedPrefixes: []string{"/v1/"}}.Wrap(fh)
+
+	cases := []struct {
+		path       string
+		wantStatus int
+		wantCalled bool
+	}{
+		{"/v1/graph", http.StatusUnauthorized, false},
+		{"/", http.StatusOK, true},
+		{"/index.html", http.StatusOK, true},
+		{"/style.css", http.StatusOK, true},
+	}
+	for _, tc := range cases {
+		fh.called = false
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", tc.path, nil)
+		h.ServeHTTP(rec, req)
+		if rec.Code != tc.wantStatus {
+			t.Errorf("%s: status = %d, want %d", tc.path, rec.Code, tc.wantStatus)
+		}
+		if fh.called != tc.wantCalled {
+			t.Errorf("%s: inner called = %v, want %v", tc.path, fh.called, tc.wantCalled)
+		}
 	}
 }
 
