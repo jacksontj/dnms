@@ -38,6 +38,7 @@ func (h *HTTPApi) Start(ctx context.Context, mux *http.ServeMux) {
 	mux.HandleFunc("/v1/graph", h.showGraph)
 	mux.HandleFunc("/v1/graph/nodes", h.showNodes)
 	mux.HandleFunc("/v1/graph/edges", h.showEdges)
+	mux.HandleFunc("/v1/graph/edges/health", h.showEdgeHealth)
 	mux.HandleFunc("/v1/graph/routes", h.showRoutes)
 
 	// Mapper endpoints
@@ -119,6 +120,17 @@ func (h *HTTPApi) showEdges(w http.ResponseWriter, r *http.Request) {
 		h.setCommonHeaders(w)
 		w.Write(ret)
 	}
+}
+
+func (h *HTTPApi) showEdgeHealth(w http.ResponseWriter, r *http.Request) {
+	ranked := h.m.Graph.RankLinksByLoss()
+	ret, err := json.Marshal(ranked)
+	if err != nil {
+		logrus.Errorf("Unable to marshal edge health: %v", err)
+		return
+	}
+	h.setCommonHeaders(w)
+	w.Write(ret)
 }
 
 func (h *HTTPApi) showRoutes(w http.ResponseWriter, r *http.Request) {
