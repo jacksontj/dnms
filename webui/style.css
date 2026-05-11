@@ -73,6 +73,16 @@ header {
     padding: 0 6px;
     line-height: 1.4;
 }
+#search {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font: inherit;
+    width: 200px;
+}
+#search:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
 button {
     background: var(--panel-2);
     color: var(--text);

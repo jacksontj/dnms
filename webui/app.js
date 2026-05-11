@@ -17,6 +17,7 @@
         healthTimer: null,           // poll timer for edges/health
         graph: null,                 // last-loaded /graph payload, used by the route picker
         route: { start: "", end: "" },
+        search: "",                  // node-name / DNS substring filter
     };
 
     // --- Bearer token auth -------------------------------------------------
@@ -209,7 +210,7 @@
             if (evt.target === state.cy) hideDetails();
         });
 
-        applyRouteHighlight();
+        applyFilters();
     }
 
     function showNodeDetails(node, graph) {
@@ -355,31 +356,30 @@
         return out;
     }
 
-    function applyRouteHighlight() {
-        if (!state.cy) return;
-        const cy = state.cy;
-        // Reset all classes/data first.
-        cy.elements().removeClass("route-match route-dim");
-        cy.edges().removeData("routeColor");
-        cy.nodes().removeData("routeColor");
+    // searchMatchedNodes returns the set of node ids matching the search
+    // query (id or any DNS name substring, case-insensitive), or null if
+    // the search filter is empty.
+    function searchMatchedNodes() {
+        const q = state.search.trim().toLowerCase();
+        if (!q) return null;
+        const matches = new Set();
+        const nodes = state.graph ? state.graph.nodes || {} : {};
+        for (const [id, n] of Object.entries(nodes)) {
+            if (id.toLowerCase().includes(q)) { matches.add(id); continue; }
+            const dns = n.dns_names || [];
+            if (dns.some(d => String(d).toLowerCase().includes(q))) matches.add(id);
+        }
+        return matches;
+    }
 
+    // routeAttribution returns {edgeWorst, nodeWorst, count} describing the
+    // route-picker selection, or null if the picker is inactive.
+    function routeAttribution() {
         const start = state.route.start, end = state.route.end;
-        if (!start || !end) {
-            setStatus(`loaded @ ${new Date().toLocaleTimeString()}`);
-            return;
-        }
+        if (!start || !end) return null;
         const routes = routesBetween(state.graph, start, end);
-        if (routes.length === 0) {
-            cy.elements().addClass("route-dim");
-            setStatus(`no routes ${start} → ${end}`);
-            return;
-        }
-
-        // For each link visited by any matching route, remember the worst
-        // (max-loss) route's color so the visualization surfaces the loss
-        // concentration rather than averaging it away.
-        const edgeWorst = new Map(); // "src;dst" → lossRate
-        const nodeWorst = new Map(); // nodeId → lossRate
+        const edgeWorst = new Map();
+        const nodeWorst = new Map();
         for (const r of routes) {
             for (let i = 1; i < r.segment.length; i++) {
                 const key = `${r.segment[i - 1]};${r.segment[i]}`;
@@ -391,32 +391,72 @@
                 if (r.lossRate > prev) nodeWorst.set(n, r.lossRate);
             }
         }
+        return { edgeWorst, nodeWorst, count: routes.length, start, end };
+    }
 
-        // Dim everything, then re-highlight the matching subset.
-        cy.elements().addClass("route-dim");
-        cy.edges().forEach((e) => {
-            const key = `${e.data("source")};${e.data("target")}`;
-            if (edgeWorst.has(key)) {
-                e.data("routeColor", lossColor(edgeWorst.get(key)));
-                e.removeClass("route-dim");
-                e.addClass("route-match");
-            }
-        });
+    // applyFilters composes the route-picker highlight and the text-search
+    // filter into a single pass over the graph. An element is fully visible
+    // only if it passes BOTH active filters; if either filter excludes it,
+    // it dims. The route picker also colors matched edges/nodes by per-route
+    // loss; the search filter doesn't color, only gates visibility.
+    function applyFilters() {
+        if (!state.cy) return;
+        const cy = state.cy;
+        cy.elements().removeClass("route-match route-dim");
+        cy.edges().removeData("routeColor");
+        cy.nodes().removeData("routeColor");
+
+        const route = routeAttribution();
+        const searchSet = searchMatchedNodes();
+        if (!route && !searchSet) {
+            setStatus(`loaded @ ${new Date().toLocaleTimeString()}`);
+            return;
+        }
+
+        // For the search filter, edges count as "matched" if either endpoint
+        // matches — that way searching for a single host still shows its
+        // immediate connections in context.
+        const nodePassesSearch = (id) => !searchSet || searchSet.has(id);
+        const edgePassesSearch = (src, dst) => !searchSet || searchSet.has(src) || searchSet.has(dst);
+
+        const nodePassesRoute = (id) => !route || route.nodeWorst.has(id);
+        const edgePassesRoute = (src, dst) => !route || route.edgeWorst.has(`${src};${dst}`);
+
         cy.nodes().forEach((n) => {
-            if (nodeWorst.has(n.id())) {
-                n.data("routeColor", lossColor(nodeWorst.get(n.id())));
-                n.removeClass("route-dim");
-                n.addClass("route-match");
+            const id = n.id();
+            if (nodePassesRoute(id) && nodePassesSearch(id)) {
+                if (route) {
+                    const loss = route.nodeWorst.get(id);
+                    if (loss != null) n.data("routeColor", lossColor(loss));
+                    n.addClass("route-match");
+                }
+            } else {
+                n.addClass("route-dim");
+            }
+        });
+        cy.edges().forEach((e) => {
+            const src = e.data("source"), dst = e.data("target");
+            if (edgePassesRoute(src, dst) && edgePassesSearch(src, dst)) {
+                if (route && route.edgeWorst.has(`${src};${dst}`)) {
+                    e.data("routeColor", lossColor(route.edgeWorst.get(`${src};${dst}`)));
+                    e.addClass("route-match");
+                }
+            } else {
+                e.addClass("route-dim");
             }
         });
 
-        setStatus(`${routes.length} route${routes.length === 1 ? "" : "s"} ${start} → ${end}`);
+        // Status line summarizes whichever filters are active.
+        const bits = [];
+        if (route) bits.push(`${route.count} route${route.count === 1 ? "" : "s"} ${route.start} → ${route.end}`);
+        if (searchSet) bits.push(`${searchSet.size} match${searchSet.size === 1 ? "" : "es"} for "${state.search}"`);
+        setStatus(bits.join("  ·  "));
     }
 
     function onRoutePickerChange() {
         state.route.start = $("#route-start").value;
         state.route.end = $("#route-end").value;
-        applyRouteHighlight();
+        applyFilters();
     }
 
     function clearRoutePicker() {
@@ -424,7 +464,12 @@
         state.route.end = "";
         $("#route-start").value = "";
         $("#route-end").value = "";
-        applyRouteHighlight();
+        applyFilters();
+    }
+
+    function onSearchChange() {
+        state.search = $("#search").value;
+        applyFilters();
     }
 
     async function refreshHealth() {
@@ -516,6 +561,7 @@
         $("#route-start").addEventListener("change", onRoutePickerChange);
         $("#route-end").addEventListener("change", onRoutePickerChange);
         $("#route-clear").addEventListener("click", clearRoutePicker);
+        $("#search").addEventListener("input", onSearchChange);
         updateAuthButton();
         loadAll();
         startSSE();
