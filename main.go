@@ -10,9 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jacksontj/dnms/aggregator"
-	"github.com/jacksontj/dnms/mapper"
 	"github.com/hashicorp/memberlist"
+	"github.com/jacksontj/dnms/aggregator"
+	"github.com/jacksontj/dnms/graph"
+	"github.com/jacksontj/dnms/mapper"
 	"github.com/sirupsen/logrus"
 )
 
@@ -24,8 +25,27 @@ func main() {
 	aggNode := flag.Bool("aggregator", false, "are you an aggregator node?")
 	httpAddr := flag.String("httpAddr", ":12345", "address for HTTP API")
 	pingPort := flag.Int("pingPort", 33435, "UDP port for ping/ack transport (must be the same on every cluster node)")
+	mapInterval := flag.Duration("mapInterval", time.Second, "pause between traceroutes inside a single source-port sweep")
+	mapSrcPortStart := flag.Int("mapSrcPortStart", 0, "first source port for traceroute mapping; 0 → pingPort+1")
+	mapSrcPortEnd := flag.Int("mapSrcPortEnd", 0, "last source port (exclusive) for traceroute mapping; 0 → mapSrcPortStart+10")
+	pingPeerInterval := flag.Duration("pingPeerInterval", 100*time.Millisecond, "pause between successive peers in a ping sweep")
+	pingRouteInterval := flag.Duration("pingRouteInterval", time.Second, "pause between successive routes when pinging one peer")
+	pingTimeout := flag.Duration("pingTimeout", time.Second, "ack timeout for a single ping")
+	metricRingSize := flag.Int("metricRingSize", 100, "number of recent ping samples retained per route")
 
 	flag.Parse()
+
+	if *mapSrcPortStart == 0 {
+		*mapSrcPortStart = *pingPort + 1
+	}
+	if *mapSrcPortEnd == 0 {
+		*mapSrcPortEnd = *mapSrcPortStart + 10
+	}
+	if *mapSrcPortStart <= *pingPort && *pingPort < *mapSrcPortEnd {
+		logrus.Fatalf("mapSrcPort range [%d,%d) overlaps the ping transport listen port %d; pick a non-overlapping range",
+			*mapSrcPortStart, *mapSrcPortEnd, *pingPort)
+	}
+	graph.MetricRingSize = *metricRingSize
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -49,6 +69,9 @@ func main() {
 
 	// Start the mapper (at this point no peers-- so it will do nothing)
 	m := mapper.NewMapper(ctx, cfg.AdvertiseAddr)
+	m.Interval = *mapInterval
+	m.SrcPortStart = *mapSrcPortStart
+	m.SrcPortEnd = *mapSrcPortEnd
 	m.Start(ctx)
 
 	// TODO pass additional config
@@ -108,6 +131,9 @@ func main() {
 			Name: mlist.LocalNode().Addr.String(),
 			Port: int(mlist.LocalNode().Port),
 		},
+		PeerInterval:  *pingPeerInterval,
+		RouteInterval: *pingRouteInterval,
+		Timeout:       *pingTimeout,
 	}
 	p.Start(ctx)
 

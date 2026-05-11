@@ -7,27 +7,29 @@ import (
 	"github.com/montanaflynn/stats"
 )
 
-// metricsRingSize is the number of recent samples retained per route/link.
-// TODO: make configurable.
-const metricsRingSize = 100
+// MetricRingSize is the number of recent samples retained per route. Set
+// before constructing the graph (e.g. from main()); subsequent reads happen
+// without synchronization so later changes are not safe.
+var MetricRingSize = 100
 
-// PingSample is a single ping outcome, recorded in both the originating route's
-// metric ring and the metric ring of every link the route traverses.
+// PingSample is a single ping outcome recorded in the originating route's
+// metric ring. Link-level attribution is derived from these route samples
+// at query time (see graph.AttributeLinkLoss) rather than fanned out into
+// per-link rings.
 type PingSample struct {
 	Pass    bool  `json:"pass"`
 	Latency int64 `json:"latencyNs"`
 }
 
-// metricsRing is a fixed-size ring of recent ping samples, safe for concurrent
-// use. Used by both NetworkRoute and NetworkLink so the summary calculation is
-// shared.
+// metricsRing is a fixed-size ring of recent ping samples, safe for
+// concurrent use.
 type metricsRing struct {
 	ring *ring.Ring
 	lock sync.RWMutex
 }
 
 func newMetricsRing() *metricsRing {
-	return &metricsRing{ring: ring.New(metricsRingSize)}
+	return &metricsRing{ring: ring.New(MetricRingSize)}
 }
 
 func (m *metricsRing) record(sample PingSample) {
