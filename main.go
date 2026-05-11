@@ -23,6 +23,7 @@ func main() {
 	peerStr := flag.String("peer", "", "address to gossip with")
 	aggNode := flag.Bool("aggregator", false, "are you an aggregator node?")
 	httpAddr := flag.String("httpAddr", ":12345", "address for HTTP API")
+	pingPort := flag.Int("pingPort", 33435, "UDP port for ping/ack transport (must be the same on every cluster node)")
 
 	flag.Parse()
 
@@ -93,9 +94,16 @@ func main() {
 		mlist.Join([]string{*peerStr})
 	}
 
+	// start the dedicated ping transport
+	transport := NewPingTransport(*pingPort)
+	if err := transport.Listen(ctx); err != nil {
+		logrus.Fatalf("Unable to start ping transport: %v", err)
+	}
+
 	// start the pinger
 	p := Pinger{
 		M: m,
+		T: transport,
 		Self: mapper.Peer{
 			Name: mlist.LocalNode().Addr.String(),
 			Port: int(mlist.LocalNode().Port),
