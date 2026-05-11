@@ -37,3 +37,64 @@ Base parts:
 * Mapper: responsible for mapping the network based on who is in the memberlist
 * Pinger: ping all peers in the network-- specifically to hit all routes in the mapper
 * Aggregator: aggregate all the graph info from the members of the memberlist
+
+## Running
+
+```sh
+go build ./...
+./dnms -gossipAddr <advertise-ip> -peer <seed-peer:33434>
+```
+
+Flags:
+
+| Flag           | Default   | Notes                                                                          |
+|----------------|-----------|--------------------------------------------------------------------------------|
+| `-gossipAddr`  | local IP  | Address advertised to the memberlist gossip layer.                             |
+| `-peer`        | (none)    | Seed `host:port` to join an existing cluster. Empty starts a standalone node.  |
+| `-aggregator`  | false     | Run the aggregator HTTP API in addition to the mapper.                         |
+| `-httpAddr`    | `:12345`  | Bind address for the HTTP API (graph, routemap, events).                       |
+| `-pingPort`    | `33435`   | UDP port for the ping/ack transport. Must be the same on every cluster node.   |
+
+Note: gossip still uses UDP/TCP `33434` (memberlist), and `-pingPort` is a
+*separate* socket that dnms owns directly — no more piggy-backing pings on the
+memberlist receive loop.
+
+## HTTP API
+
+All endpoints return JSON. Useful ones:
+
+| Path                          | Description                                                         |
+|-------------------------------|---------------------------------------------------------------------|
+| `/v1/graph`                   | Full per-node graph (nodes + edges + routes).                       |
+| `/v1/graph/nodes`             | Just the nodes the mapper has observed.                             |
+| `/v1/graph/edges`             | Just the links.                                                     |
+| `/v1/graph/edges/health`      | Per-link fault attribution — see below.                             |
+| `/v1/graph/routes`            | Routes with per-route loss/latency/jitter metrics.                  |
+| `/v1/mapper/peers`            | Peers the local node knows about.                                   |
+| `/v1/mapper/routemap`         | `(src,dst)` → route lookup.                                         |
+| `/v1/events/graph`            | Server-Sent Events stream of graph mutations.                       |
+| `/v1/aggregator/graph*`       | Same shapes as `/v1/graph*`, but over the cluster-wide merged view. |
+| `/v1/aggregator/events/graph` | SSE stream of the aggregated graph.                                 |
+
+### Per-link fault attribution: `/v1/graph/edges/health`
+
+Between any two peers there are usually N different paths through the
+intermediate network. Each route has its own observed loss rate. To figure out
+*which hop* is responsible for the loss, dnms correlates per-route loss
+observations with link membership:
+
+```
+For each link L:
+  AvgLossThrough    = sample-weighted mean lossRate of routes containing L
+  AvgLossNotThrough = sample-weighted mean lossRate of routes NOT containing L
+  Suspicion         = AvgLossThrough − AvgLossNotThrough
+```
+
+The endpoint returns one row per link sorted by `suspicion` descending. A
+genuinely bad link surfaces with a high positive score because every route
+through it shares its loss while routes avoiding it don't; a healthy link on
+otherwise noisy paths lands near zero or negative.
+
+The same correlation runs on the aggregator side at
+`/v1/aggregator/graph/edges/health`, where it has access to every peer's
+routes — much more evidence than any single mapper sees on its own.
