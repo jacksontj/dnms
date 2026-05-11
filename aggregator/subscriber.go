@@ -1,27 +1,36 @@
 package aggregator
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jacksontj/dnms/graph"
 	"github.com/jacksontj/eventsource"
+	"github.com/sirupsen/logrus"
 )
 
 // Subscripe to dest, consuming events into PeerGraphMap.
 // We'll return a bool channel which can be used to cancel the subscription
-func Subscribe(p *PeerGraphMap) chan bool {
+// (or the goroutine exits when ctx is canceled).
+func Subscribe(ctx context.Context, p *PeerGraphMap) chan bool {
 	exitChan := make(chan bool)
 	go func() {
 		var stream *eventsource.Stream
 		for {
+			if ctx.Err() != nil {
+				return
+			}
 			logrus.Infof("connecting to peer: %v", p.Name)
 			var err error
 			stream, err = eventsource.Subscribe("http://"+p.Name+":12345/v1/events/graph", "")
 			if err != nil {
 				logrus.Errorf("Error subscribing, retrying: %v", err)
-				time.Sleep(time.Second)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second):
+				}
 			} else {
 				break
 			}
@@ -121,6 +130,8 @@ func Subscribe(p *PeerGraphMap) chan bool {
 
 				}
 			case <-exitChan:
+				return
+			case <-ctx.Done():
 				return
 			}
 		}

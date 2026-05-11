@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net"
 	"strconv"
@@ -24,31 +25,37 @@ type Pinger struct {
 	Self mapper.Peer
 }
 
-func (p *Pinger) Start() {
-	go p.PingPeers()
-}
-
-// TODO implement
-func (p *Pinger) Stop() {
-
+// Start begins pinging peers. The pinger exits when ctx is canceled.
+func (p *Pinger) Start(ctx context.Context) {
+	go p.PingPeers(ctx)
 }
 
 // ping all the things
-func (p *Pinger) PingPeers() {
-	for {
+func (p *Pinger) PingPeers(ctx context.Context) {
+	for ctx.Err() == nil {
 		peerChan := p.M.IterPeers()
 		for peer := range peerChan {
-			p.PingPeer(peer)
+			if ctx.Err() != nil {
+				return
+			}
+			p.PingPeer(ctx, peer)
 			// TODO configurable rate
-			time.Sleep(time.Millisecond * 100)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(100 * time.Millisecond):
+			}
 		}
 	}
 }
 
-func (p *Pinger) PingPeer(peer *mapper.Peer) {
+func (p *Pinger) PingPeer(ctx context.Context, peer *mapper.Peer) {
 	c := make(chan string)
 	p.M.RouteMap.IterRoutes(peer.String(), c)
 	for routeKey := range c {
+		if ctx.Err() != nil {
+			return
+		}
 		route := p.M.RouteMap.GetRoute(routeKey)
 		// TODO: better
 		if route == nil {
@@ -151,6 +158,10 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 		route.HandleACK(passed, time.Now().UnixNano()-pkt.PingTimeNS)
 		conn.Close()
 		// TODO: configurable ping sleep
-		time.Sleep(time.Second)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Second):
+		}
 	}
 }

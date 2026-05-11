@@ -1,10 +1,11 @@
 package aggregator
 
 import (
+	"context"
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jacksontj/dnms/graph"
+	"github.com/sirupsen/logrus"
 )
 
 // This wraps graph.NetworkGraph to keep track of a given peer's refcounts on the
@@ -26,7 +27,7 @@ type PeerGraphMap struct {
 	subscriberExit chan bool
 }
 
-func NewPeerGraphMap(name string, g *graph.NetworkGraph) *PeerGraphMap {
+func NewPeerGraphMap(ctx context.Context, name string, g *graph.NetworkGraph) *PeerGraphMap {
 	p := &PeerGraphMap{
 		Name:       name,
 		nodesMap:   make(map[*graph.NetworkNode]int),
@@ -40,7 +41,7 @@ func NewPeerGraphMap(name string, g *graph.NetworkGraph) *PeerGraphMap {
 	}
 
 	// subscribe
-	c := Subscribe(p)
+	c := Subscribe(ctx, p)
 
 	p.subscriberExit = c
 
