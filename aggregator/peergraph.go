@@ -27,7 +27,7 @@ type PeerGraphMap struct {
 	subscriberExit chan bool
 }
 
-func NewPeerGraphMap(ctx context.Context, name string, g *graph.NetworkGraph) *PeerGraphMap {
+func NewPeerGraphMap(ctx context.Context, name string, g *graph.NetworkGraph, token string) *PeerGraphMap {
 	p := &PeerGraphMap{
 		Name:       name,
 		nodesMap:   make(map[*graph.NetworkNode]int),
@@ -41,7 +41,7 @@ func NewPeerGraphMap(ctx context.Context, name string, g *graph.NetworkGraph) *P
 	}
 
 	// subscribe
-	c := Subscribe(ctx, p)
+	c := Subscribe(ctx, p, token)
 
 	p.subscriberExit = c
 

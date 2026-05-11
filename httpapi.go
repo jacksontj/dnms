@@ -24,8 +24,9 @@ func NewHTTPApi(m *mapper.Mapper) *HTTPApi {
 		eventBroker: eventsource.NewServer(),
 	}
 
-	// TODO: config
-	api.eventBroker.AllowCORS = true
+	// CORS is handled by the HTTPSecurity middleware wrapping the mux, so
+	// keep eventBroker.AllowCORS false — otherwise the SSE handler would
+	// always overwrite the middleware's Access-Control-Allow-Origin with "*".
 
 	return api
 }
@@ -76,9 +77,10 @@ func (h *HTTPApi) republishGraphEvents(ctx context.Context) {
 	}
 }
 
-// TODO: better, terrible things are here
+// setCommonHeaders sets per-response headers that apply to every handler.
+// CORS is handled by the HTTPSecurity middleware in main; don't set it here
+// or we'd silently override the operator's -httpAllowOrigin choice.
 func (h *HTTPApi) setCommonHeaders(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 }
 

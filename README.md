@@ -54,6 +54,15 @@ Flags:
 | `-aggregator`  | false     | Run the aggregator HTTP API in addition to the mapper.                         |
 | `-httpAddr`    | `:12345`  | Bind address for the HTTP API (graph, routemap, events).                       |
 | `-pingPort`    | `33435`   | UDP port for the ping/ack transport. Must be the same on every cluster node.   |
+| `-mapInterval` | `1s`      | Pause between traceroutes inside a single source-port sweep.                   |
+| `-mapSrcPortStart` / `-mapSrcPortEnd` | auto | Source-port range used to elicit ECMP variation. Defaults to `pingPort+1 .. +11`; main fatals at startup if the range overlaps `-pingPort`. |
+| `-pingPeerInterval`  | `100ms` | Pause between successive peers in a ping sweep.                          |
+| `-pingRouteInterval` | `1s`    | Pause between successive routes when pinging one peer.                   |
+| `-pingTimeout`       | `1s`    | Ack timeout for a single ping.                                           |
+| `-metricRingSize`    | `100`   | Number of recent ping samples retained per route.                        |
+| `-httpAllowOrigin`   | `*`     | Value for `Access-Control-Allow-Origin`. Lock down by setting to a specific origin. |
+| `-httpToken`         | (none)  | If non-empty, requires `Authorization: Bearer <token>` on every HTTP API request. |
+| `-aggregatorToken`   | (none)  | Token the aggregator sends when subscribing to peers; defaults to `-httpToken`. |
 
 Note: gossip still uses UDP/TCP `33434` (memberlist), and `-pingPort` is a
 *separate* socket that dnms owns directly — no more piggy-backing pings on the

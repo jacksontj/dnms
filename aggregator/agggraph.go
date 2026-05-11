@@ -19,6 +19,10 @@ type AggGraphMap struct {
 	mapLock *sync.RWMutex
 
 	Graph *graph.NetworkGraph
+
+	// SubscribeToken, if set, is sent as a bearer Authorization header on
+	// every peer SSE subscription. Empty disables the header.
+	SubscribeToken string
 }
 
 func NewAggGraphMap(ctx context.Context) *AggGraphMap {
@@ -35,7 +39,7 @@ func (p *AggGraphMap) AddPeer(peer string) {
 	defer p.mapLock.Unlock()
 	_, ok := p.peerMap[peer]
 	if !ok {
-		p.peerMap[peer] = NewPeerGraphMap(p.ctx, peer, p.Graph)
+		p.peerMap[peer] = NewPeerGraphMap(p.ctx, peer, p.Graph, p.SubscribeToken)
 	}
 }
 

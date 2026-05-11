@@ -3,6 +3,7 @@ package aggregator
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"time"
 
 	"github.com/jacksontj/dnms/graph"
@@ -10,10 +11,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Subscripe to dest, consuming events into PeerGraphMap.
+// Subscribe to dest, consuming events into PeerGraphMap. token, if non-empty,
+// is sent as an "Authorization: Bearer <token>" header so the subscriber
+// can authenticate against peers that have -httpToken configured.
 // We'll return a bool channel which can be used to cancel the subscription
 // (or the goroutine exits when ctx is canceled).
-func Subscribe(ctx context.Context, p *PeerGraphMap) chan bool {
+func Subscribe(ctx context.Context, p *PeerGraphMap, token string) chan bool {
 	exitChan := make(chan bool)
 	go func() {
 		var stream *eventsource.Stream
@@ -23,7 +26,7 @@ func Subscribe(ctx context.Context, p *PeerGraphMap) chan bool {
 			}
 			logrus.Infof("connecting to peer: %v", p.Name)
 			var err error
-			stream, err = eventsource.Subscribe("http://"+p.Name+":12345/v1/events/graph", "")
+			stream, err = subscribeWithAuth("http://"+p.Name+":12345/v1/events/graph", token)
 			if err != nil {
 				logrus.Errorf("Error subscribing, retrying: %v", err)
 				select {
@@ -137,4 +140,18 @@ func Subscribe(ctx context.Context, p *PeerGraphMap) chan bool {
 		}
 	}()
 	return exitChan
+}
+
+// subscribeWithAuth wraps eventsource.Subscribe so we can attach a bearer
+// token when the peer is running with -httpToken. token may be empty.
+func subscribeWithAuth(url, token string) (*eventsource.Stream, error) {
+	if token == "" {
+		return eventsource.Subscribe(url, "")
+	}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	return eventsource.SubscribeWithRequest("", req)
 }
