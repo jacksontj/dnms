@@ -23,8 +23,8 @@ func NewHTTPApi(p *AggGraphMap) *HTTPApi {
 		eventBroker: eventsource.NewServer(),
 	}
 
-	// TODO: config
-	api.eventBroker.AllowCORS = true
+	// CORS is handled by the HTTPSecurity middleware on the main mux; see
+	// the comment in httpapi.go (mapper side) for details.
 
 	return api
 }
@@ -69,9 +69,9 @@ func (h *HTTPApi) republishGraphEvents(ctx context.Context) {
 	}
 }
 
-// TODO: better, terrible things are here
+// setCommonHeaders sets per-response headers that apply to every handler.
+// CORS is handled by the HTTPSecurity middleware in main.
 func (h *HTTPApi) setCommonHeaders(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 }
 

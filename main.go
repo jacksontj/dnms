@@ -32,6 +32,9 @@ func main() {
 	pingRouteInterval := flag.Duration("pingRouteInterval", time.Second, "pause between successive routes when pinging one peer")
 	pingTimeout := flag.Duration("pingTimeout", time.Second, "ack timeout for a single ping")
 	metricRingSize := flag.Int("metricRingSize", 100, "number of recent ping samples retained per route")
+	httpAllowOrigin := flag.String("httpAllowOrigin", "*", "value for Access-Control-Allow-Origin; set to a specific origin to lock down CORS")
+	httpToken := flag.String("httpToken", "", "if non-empty, require Authorization: Bearer <token> on every HTTP API request")
+	aggToken := flag.String("aggregatorToken", "", "token the aggregator sends in Authorization headers when subscribing to peers; defaults to -httpToken")
 
 	flag.Parse()
 
@@ -83,7 +86,12 @@ func main() {
 	// If we are an aggregator start that
 	var aggMap *aggregator.AggGraphMap
 	if *aggNode {
+		token := *aggToken
+		if token == "" {
+			token = *httpToken
+		}
 		aggMap = aggregator.NewAggGraphMap(ctx)
+		aggMap.SubscribeToken = token
 		aggApi := aggregator.NewHTTPApi(aggMap)
 		aggApi.Start(ctx, mux)
 		// TODO: through something better than http, it is local after all
@@ -91,7 +99,8 @@ func main() {
 		aggMap.AddPeer("127.0.0.1")
 	}
 
-	srv := &http.Server{Addr: *httpAddr, Handler: mux}
+	sec := HTTPSecurity{AllowOrigin: *httpAllowOrigin, Token: *httpToken}
+	srv := &http.Server{Addr: *httpAddr, Handler: sec.Wrap(mux)}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logrus.Errorf("HTTP server error: %v", err)
