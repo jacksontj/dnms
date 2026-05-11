@@ -15,6 +15,8 @@
         cy: null,                    // cytoscape instance
         eventSource: null,           // SSE for live graph mutations
         healthTimer: null,           // poll timer for edges/health
+        graph: null,                 // last-loaded /graph payload, used by the route picker
+        route: { start: "", end: "" },
     };
 
     // --- Bearer token auth -------------------------------------------------
@@ -104,6 +106,16 @@
         if (v < 0.25) return "#ffb53d"; // amber
         return "#ff5a6b";               // red
     }
+    // Same shape as suspicionColor but tuned for raw loss rates (0..1). The
+    // route-picker recolors highlighted edges by per-route loss; we want any
+    // measurable loss to register, not just suspicion deltas.
+    function lossColor(l) {
+        if (l == null || !isFinite(l)) return "#6a6f80";
+        const v = Math.max(0, Math.min(1, l));
+        if (v < 0.01) return "#4cd07a"; // green
+        if (v < 0.05) return "#ffb53d"; // amber
+        return "#ff5a6b";               // red
+    }
 
     function renderGraph(graph, healthByEdge) {
         const nodes = Object.entries(graph.nodes || {}).map(([id, n]) => ({
@@ -166,6 +178,27 @@
                     selector: "edge:selected",
                     style: { width: 4 },
                 },
+                // Route-picker focus/context styling. .route-match highlights
+                // the edges/nodes on a selected (start → end) path; .route-dim
+                // fades everything else so the user's eye stays on what
+                // matters.
+                {
+                    selector: ".route-match",
+                    style: {
+                        "line-color": "data(routeColor)",
+                        "target-arrow-color": "data(routeColor)",
+                        width: 4,
+                        opacity: 1,
+                    },
+                },
+                {
+                    selector: "node.route-match",
+                    style: { "background-color": "data(routeColor)", "border-color": "#fff", "border-width": 2 },
+                },
+                {
+                    selector: ".route-dim",
+                    style: { opacity: 0.15 },
+                },
             ],
             layout: { name: "cose", animate: false, fit: true, padding: 30 },
         });
@@ -175,6 +208,8 @@
         state.cy.on("tap", (evt) => {
             if (evt.target === state.cy) hideDetails();
         });
+
+        applyRouteHighlight();
     }
 
     function showNodeDetails(node, graph) {
@@ -267,14 +302,129 @@
             ]);
             const healthByEdge = {};
             for (const h of health) healthByEdge[`${h.src};${h.dst}`] = h;
+            state.graph = graph;
             updateCounts(graph);
             renderGraph(graph, healthByEdge);
+            populateRoutePicker(graph);
             setStatus(`loaded @ ${new Date().toLocaleTimeString()}`);
             setError(null);
         } catch (err) {
             setError(err.message);
             setStatus("error");
         }
+    }
+
+    // --- Route picker ------------------------------------------------------
+    //
+    // Pick a start + end node from the dropdowns and we highlight every
+    // route whose path passes through start somewhere before end. Each
+    // highlighted edge is colored by the worst (highest-loss) route that
+    // traverses it — so the operator sees both "which paths matter for this
+    // pair" and "where the loss is concentrated."
+
+    function populateRoutePicker(graph) {
+        const ids = Object.keys(graph.nodes || {}).sort();
+        for (const sel of ["#route-start", "#route-end"]) {
+            const el = $(sel);
+            const current = el.value;
+            const placeholder = sel === "#route-start" ? "(start)" : "(end)";
+            el.innerHTML = `<option value="">${placeholder}</option>`
+                + ids.map(id => `<option value="${escape(id)}">${escape(id)}</option>`).join("");
+            // Preserve the user's pick across reloads if the node still exists.
+            if (current && ids.includes(current)) el.value = current;
+        }
+    }
+
+    function routesBetween(graph, start, end) {
+        const out = [];
+        if (!graph || !start || !end || start === end) return out;
+        for (const [id, r] of Object.entries(graph.routes || {})) {
+            const path = r.path || [];
+            const si = path.indexOf(start);
+            if (si < 0) continue;
+            const ei = path.indexOf(end, si + 1);
+            if (ei < 0) continue;
+            out.push({
+                id,
+                path,
+                segment: path.slice(si, ei + 1),
+                lossRate: r.metrics ? r.metrics.lossRate : 0,
+                numPoints: r.metrics ? r.metrics.numPoints : 0,
+            });
+        }
+        return out;
+    }
+
+    function applyRouteHighlight() {
+        if (!state.cy) return;
+        const cy = state.cy;
+        // Reset all classes/data first.
+        cy.elements().removeClass("route-match route-dim");
+        cy.edges().removeData("routeColor");
+        cy.nodes().removeData("routeColor");
+
+        const start = state.route.start, end = state.route.end;
+        if (!start || !end) {
+            setStatus(`loaded @ ${new Date().toLocaleTimeString()}`);
+            return;
+        }
+        const routes = routesBetween(state.graph, start, end);
+        if (routes.length === 0) {
+            cy.elements().addClass("route-dim");
+            setStatus(`no routes ${start} → ${end}`);
+            return;
+        }
+
+        // For each link visited by any matching route, remember the worst
+        // (max-loss) route's color so the visualization surfaces the loss
+        // concentration rather than averaging it away.
+        const edgeWorst = new Map(); // "src;dst" → lossRate
+        const nodeWorst = new Map(); // nodeId → lossRate
+        for (const r of routes) {
+            for (let i = 1; i < r.segment.length; i++) {
+                const key = `${r.segment[i - 1]};${r.segment[i]}`;
+                const prev = edgeWorst.get(key) ?? -Infinity;
+                if (r.lossRate > prev) edgeWorst.set(key, r.lossRate);
+            }
+            for (const n of r.segment) {
+                const prev = nodeWorst.get(n) ?? -Infinity;
+                if (r.lossRate > prev) nodeWorst.set(n, r.lossRate);
+            }
+        }
+
+        // Dim everything, then re-highlight the matching subset.
+        cy.elements().addClass("route-dim");
+        cy.edges().forEach((e) => {
+            const key = `${e.data("source")};${e.data("target")}`;
+            if (edgeWorst.has(key)) {
+                e.data("routeColor", lossColor(edgeWorst.get(key)));
+                e.removeClass("route-dim");
+                e.addClass("route-match");
+            }
+        });
+        cy.nodes().forEach((n) => {
+            if (nodeWorst.has(n.id())) {
+                n.data("routeColor", lossColor(nodeWorst.get(n.id())));
+                n.removeClass("route-dim");
+                n.addClass("route-match");
+            }
+        });
+
+        setStatus(`${routes.length} route${routes.length === 1 ? "" : "s"} ${start} → ${end}`);
+    }
+
+    function onRoutePickerChange() {
+        state.route.start = $("#route-start").value;
+        state.route.end = $("#route-end").value;
+        applyRouteHighlight();
+    }
+
+    function clearRoutePicker() {
+        state.route.start = "";
+        state.route.end = "";
+        $("#route-start").value = "";
+        $("#route-end").value = "";
+        applyRouteHighlight();
     }
 
     async function refreshHealth() {
@@ -363,6 +513,9 @@
         $("#refresh").addEventListener("click", loadAll);
         $("#details-close").addEventListener("click", hideDetails);
         $("#auth-btn").addEventListener("click", onAuthClick);
+        $("#route-start").addEventListener("change", onRoutePickerChange);
+        $("#route-end").addEventListener("change", onRoutePickerChange);
+        $("#route-clear").addEventListener("click", clearRoutePicker);
         updateAuthButton();
         loadAll();
         startSSE();
