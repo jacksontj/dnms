@@ -47,7 +47,7 @@ func (d *DNMSDelegate) NotifyMsg(buf []byte) {
 		p := ping{}
 		err := decode(buf, &p)
 		if err != nil {
-			logrus.Warning("Unable to decode message: %v", err)
+			logrus.Warningf("Unable to decode message: %v", err)
 			return
 		}
 

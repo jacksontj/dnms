@@ -56,7 +56,7 @@ func (m *Mapper) AddPeer(p Peer) {
 	defer m.peerLock.Unlock()
 	_, ok := m.peerMap[p.Name]
 	if ok {
-		logrus.Warning("Mapper asked to add peer that already exists: %v", p)
+		logrus.Warningf("Mapper asked to add peer that already exists: %v", p)
 		return
 	} else {
 		m.peerMap[p.Name] = &p
@@ -79,7 +79,7 @@ func (m *Mapper) RemovePeer(p Peer) {
 		// delete the peer
 		delete(m.peerMap, p.Name)
 	} else {
-		logrus.Warning("Mapper asked to remove peer that doesn't exists: %v", p)
+		logrus.Warningf("Mapper asked to remove peer that doesn't exist: %v", p)
 	}
 }
 

@@ -117,7 +117,7 @@ func (p *Pinger) PingPeer(peer *mapper.Peer) {
 				a := ack{}
 				err := decode(retBuf, &a)
 				if err != nil {
-					logrus.Warning("Unable to decode message: %v", err)
+					logrus.Warningf("Unable to decode message: %v", err)
 				} else {
 					passed = true
 				}
