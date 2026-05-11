@@ -76,7 +76,13 @@ func (h *HTTPApi) setCommonHeaders(w http.ResponseWriter) {
 }
 
 func (h *HTTPApi) showGraph(w http.ResponseWriter, r *http.Request) {
+	h.m.Graph.NodesLock.RLock()
+	h.m.Graph.LinksLock.RLock()
+	h.m.Graph.RoutesLock.RLock()
 	ret, err := json.Marshal(h.m.Graph)
+	h.m.Graph.RoutesLock.RUnlock()
+	h.m.Graph.LinksLock.RUnlock()
+	h.m.Graph.NodesLock.RUnlock()
 	if err != nil {
 		logrus.Errorf("Unable to marshal Graph: %v", err)
 	} else {
@@ -86,6 +92,8 @@ func (h *HTTPApi) showGraph(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPApi) showNodes(w http.ResponseWriter, r *http.Request) {
+	h.m.Graph.NodesLock.RLock()
+	defer h.m.Graph.NodesLock.RUnlock()
 	ret, err := json.Marshal(h.m.Graph.NodesMap)
 	if err != nil {
 		logrus.Errorf("Unable to marshal Graph.NodesMap: %v", err)
@@ -96,6 +104,8 @@ func (h *HTTPApi) showNodes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPApi) showEdges(w http.ResponseWriter, r *http.Request) {
+	h.m.Graph.LinksLock.RLock()
+	defer h.m.Graph.LinksLock.RUnlock()
 	ret, err := json.Marshal(h.m.Graph.LinksMap)
 	if err != nil {
 		logrus.Errorf("Unable to marshal Graph.LinksMap: %v", err)
@@ -106,6 +116,8 @@ func (h *HTTPApi) showEdges(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPApi) showRoutes(w http.ResponseWriter, r *http.Request) {
+	h.m.Graph.RoutesLock.RLock()
+	defer h.m.Graph.RoutesLock.RUnlock()
 	ret, err := json.Marshal(h.m.Graph.RoutesMap)
 	if err != nil {
 		logrus.Errorf("Unable to marshal Graph.RoutesMap: %v", err)
