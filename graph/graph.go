@@ -2,11 +2,11 @@
 package graph
 
 import (
-	"container/ring"
 	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"io"
+	"sort"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -180,6 +180,34 @@ func (g *NetworkGraph) DecrNode(name string) (*NetworkNode, bool) {
 	return n, false
 }
 
+// RankLinksByLoss returns a flat snapshot of every link in the graph sorted by
+// lossRate descending — the bad hops surface first. Links with no samples are
+// included with 0 values so callers can distinguish "no data" from "no loss".
+func (g *NetworkGraph) RankLinksByLoss() []LinkHealth {
+	g.LinksLock.RLock()
+	out := make([]LinkHealth, 0, len(g.LinksMap))
+	for _, l := range g.LinksMap {
+		s := l.Metrics()
+		out = append(out, LinkHealth{
+			Src:     l.SrcName,
+			Dst:     l.DstName,
+			Samples: s.NumPoints,
+			Loss:    s.LossRate,
+			AvgNs:   s.AverageLatencyNs,
+		})
+	}
+	g.LinksLock.RUnlock()
+	sort.Slice(out, func(i, j int) bool {
+		// Primary: higher lossRate first. Tiebreak by sample count so links
+		// with more evidence rank ahead of newly-seen ones.
+		if out[i].Loss != out[j].Loss {
+			return out[i].Loss > out[j].Loss
+		}
+		return out[i].Samples > out[j].Samples
+	})
+	return out
+}
+
 func (g *NetworkGraph) IncrLink(src, dst string, newLink *NetworkLink) (*NetworkLink, bool) {
 	key := src + ";" + dst
 	g.LinksLock.Lock()
@@ -272,24 +300,30 @@ func (g *NetworkGraph) IncrRoute(hops []string, newRoute *NetworkRoute) (*Networ
 		logrus.Debugf("New Route: key=%s %v", key, hops)
 		if newRoute == nil {
 			path := make([]*NetworkNode, 0, len(hops))
+			linkPath := make([]*NetworkLink, 0, max(0, len(hops)-1))
 			for i, hop := range hops {
 				hopNode, _ := g.IncrNode(hop, nil)
 				path = append(path, hopNode)
 				// If there was something prior-- lets add the link as well
 				if i-1 >= 0 {
-					g.IncrLink(hops[i-1], hop, nil)
+					link, _ := g.IncrLink(hops[i-1], hop, nil)
+					linkPath = append(linkPath, link)
 				}
 			}
 			route = &NetworkRoute{
 				Path:       hops,
 				path:       path,
+				linkPath:   linkPath,
 				State:      Up,
-				metricRing: ring.New(100), // TODO: config
-				mLock:      &sync.RWMutex{},
+				metrics:    newMetricsRing(),
 				updateChan: g.internalEvents,
 			}
 		} else {
 			newRoute.path = make([]*NetworkNode, len(newRoute.Path))
+			newRoute.linkPath = make([]*NetworkLink, 0, max(0, len(newRoute.Path)-1))
+			if newRoute.metrics == nil {
+				newRoute.metrics = newMetricsRing()
+			}
 			for i, nodeName := range newRoute.Path {
 				// Increment the node (this will convert the name to a pointer)
 				node, _ := g.IncrNode(nodeName, nil)
@@ -298,7 +332,8 @@ func (g *NetworkGraph) IncrRoute(hops []string, newRoute *NetworkRoute) (*Networ
 
 				// If there was something prior-- lets add the link as well
 				if i-1 >= 0 {
-					g.IncrLink(newRoute.path[i-1].Name, nodeName, nil)
+					link, _ := g.IncrLink(newRoute.path[i-1].Name, nodeName, nil)
+					newRoute.linkPath = append(newRoute.linkPath, link)
 				}
 			}
 			route = newRoute

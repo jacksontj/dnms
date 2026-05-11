@@ -1,37 +1,37 @@
 package graph
 
 import (
-	"container/ring"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
 	"io"
 	"sync"
-
-	"github.com/montanaflynn/stats"
 )
 
 // TODO: measure jitter (diff between 2 packet sends)
-type RoutePingResponse struct {
-	Pass    bool  // Did it ack?
-	Latency int64 // Latency (if it ackd)
-}
+//
+// RoutePingResponse is retained as a type alias for backward compat with
+// callers that constructed the old struct directly.
+type RoutePingResponse = PingSample
 
 // TODO: RoundTripRoute? Right now the Route is a single direction since we only
 // have one side of the traceroute. If the peers gossip about the reverse routes
 // then we could potentially have both directions
 // TODO: TTL for routes? If we just start up we don't want to have to re-ping the
 // world before we are useful
-// TODO: stats about route health
 type NetworkRoute struct {
 	Path []string       `json:"path"`
 	path []*NetworkNode `json:"-"`
 
+	// linkPath caches the *NetworkLink chain for this route so HandleACK can
+	// fan out per-ack metrics without re-resolving links.
+	linkPath []*NetworkLink
+
 	// Network statistics
 	State graphState `json:"state"` // TODO: better handle in the serialization
 
-	metricRing *ring.Ring
-	mLock      *sync.RWMutex
+	metrics *metricsRing
+	stateMu sync.Mutex
 
 	// how many are refrencing it
 	refCount int
@@ -45,9 +45,7 @@ type NetworkRoute struct {
 // changes we'll need to be more careful here-- as we are just pointing at
 // another ring-- which has its own pings going on
 func (r *NetworkRoute) Inherit(o *NetworkRoute) {
-	r.mLock.Lock()
-	defer r.mLock.Unlock()
-	r.metricRing = o.metricRing
+	r.metrics = o.metrics
 }
 
 func (r *NetworkRoute) Key() string {
@@ -59,18 +57,18 @@ func (r *NetworkRoute) Key() string {
 }
 
 func (r *NetworkRoute) HandleACK(pass bool, latency int64) {
-	r.mLock.Lock()
-	defer r.mLock.Unlock()
-	r.metricRing.Value = RoutePingResponse{
-		Pass:    pass,
-		Latency: latency,
-	}
-	r.metricRing = r.metricRing.Next()
+	sample := PingSample{Pass: pass, Latency: latency}
+	r.metrics.record(sample)
 
-	// TODO: change to percentage thresholds
-	// update state
+	// Fan out per-ack metrics to each link this route traverses, so we can
+	// later attribute loss/latency to individual hops.
+	for _, l := range r.linkPath {
+		l.recordSample(sample)
+	}
+
+	r.stateMu.Lock()
 	origState := r.State
-	if pass == true { // Going up
+	if pass { // Going up
 		switch r.State {
 		case Suspect:
 			r.State = Up
@@ -85,9 +83,11 @@ func (r *NetworkRoute) HandleACK(pass bool, latency int64) {
 			r.State = Down
 		}
 	}
+	newState := r.State
+	r.stateMu.Unlock()
 
 	// TODO: also send updates when metrics change sufficiently?
-	if origState != r.State {
+	if origState != newState {
 		r.updateChan <- &Event{
 			E:    updateEvent,
 			Item: r,
@@ -132,50 +132,12 @@ func (r *NetworkRoute) Hops() []string {
 
 // Fancy marshal method
 func (r *NetworkRoute) MarshalJSON() ([]byte, error) {
-	r.mLock.RLock()
-	defer r.mLock.RUnlock()
-	// Convert MetricRing to a list of points
-	fail := 0
-	// TODO: re-add raw points
-	metricPoints := make([]RoutePingResponse, 0, r.metricRing.Len())
-	latencies := make([]float64, 0, r.metricRing.Len())
-	r.metricRing.Do(func(x interface{}) {
-		if x != nil {
-			point := x.(RoutePingResponse)
-			metricPoints = append(metricPoints, point)
-			latencies = append(latencies, float64(point.Latency))
-			if !point.Pass {
-				fail++
-			}
-		}
-	})
-
-	// Do all metrics calculations here
-	metrics := make(map[string]interface{})
-	metrics["numPoints"] = len(metricPoints)
-	if len(metricPoints) > 0 {
-		var totalLatency float64 = 0
-		for _, l := range latencies {
-			totalLatency += l
-		}
-		metrics["average"] = float64(totalLatency) / float64(len(metricPoints))
-		metrics["lossRate"] = float64(fail) / float64(len(metricPoints))
-	} else {
-		metrics["average"] = float64(0)
-		metrics["lossRate"] = float64(0)
-	}
-	if dev, err := stats.StandardDeviation(latencies); err == nil {
-		metrics["standardDeviation"] = dev
-	}
-
 	type Alias NetworkRoute
 	return json.Marshal(&struct {
-		//MetricPoints []RoutePingResponse
-		Metrics map[string]interface{} `json:"metrics"`
+		Metrics MetricSummary `json:"metrics"`
 		*Alias
 	}{
-		//MetricPoints: metricPoints,
-		Metrics: metrics,
+		Metrics: r.metrics.summary(),
 		Alias:   (*Alias)(r),
 	})
 }
@@ -191,7 +153,6 @@ func (r *NetworkRoute) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
-	r.metricRing = ring.New(100) // TODO: config
-	r.mLock = &sync.RWMutex{}
+	r.metrics = newMetricsRing()
 	return nil
 }
