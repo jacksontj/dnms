@@ -45,6 +45,9 @@ go build ./...
 ./dnms -gossipAddr <advertise-ip> -peer <seed-peer:33434>
 ```
 
+Open `http://<host>:12345/` in a browser for the embedded dashboard
+(see [Web UI](#web-ui) below).
+
 Flags:
 
 | Flag           | Default   | Notes                                                                          |
@@ -107,3 +110,35 @@ otherwise noisy paths lands near zero or negative.
 The same correlation runs on the aggregator side at
 `/v1/aggregator/graph/edges/health`, where it has access to every peer's
 routes — much more evidence than any single mapper sees on its own.
+
+## Web UI
+
+The binary serves an embedded browser dashboard at `/` on the HTTP port.
+It's a single-page app (`webui/`, bundled into the binary via `embed.FS`)
+that renders the graph with [Cytoscape](https://js.cytoscape.org/) and
+talks to the same `/v1` JSON endpoints documented above.
+
+Features:
+
+- Force-directed network graph; click any node or link to open a details
+  panel on the right.
+- Links are color-coded by their **suspicion** score — green when a hop
+  looks healthy, amber for marginal, red for likely-faulty. The thresholds
+  match the legend in the side panel.
+- The node panel shows DNS reverse-lookup names (if any) and the
+  suspicion of each incident link.
+- The link panel surfaces `AvgLossThrough` vs `AvgLossNotThrough` and
+  lists every route currently traversing that link with its observed
+  loss rate and sample count — the operator-facing view of the
+  attribution algorithm.
+- Header toggle switches between the mapper view (this node's
+  observations) and the aggregator view (cluster-wide merged graph),
+  same UI in both cases.
+- Live updates: the page subscribes to the SSE event stream and
+  reloads on any add/remove/update; suspicion is refreshed by polling
+  the `edges/health` endpoint every 5 s (it's computed server-side at
+  query time, not pushed).
+
+The dashboard is fully self-contained — no external CDN, no build step.
+Auth respects the `-httpToken` and `-httpAllowOrigin` flags
+automatically because it's same-origin.
