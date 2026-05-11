@@ -25,7 +25,7 @@ type RoutePingResponse struct {
 // TODO: stats about route health
 type NetworkRoute struct {
 	Path []string       `json:"path"`
-	path []*NetworkNode `json:"path"`
+	path []*NetworkNode `json:"-"`
 
 	// Network statistics
 	State graphState `json:"state"` // TODO: better handle in the serialization
