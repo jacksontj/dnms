@@ -14,6 +14,7 @@ import (
 	"github.com/jacksontj/dnms/aggregator"
 	"github.com/jacksontj/dnms/graph"
 	"github.com/jacksontj/dnms/mapper"
+	"github.com/jacksontj/dnms/webui"
 	"github.com/sirupsen/logrus"
 )
 
@@ -82,6 +83,11 @@ func main() {
 	mux := http.NewServeMux()
 	api := NewHTTPApi(m)
 	api.Start(ctx, mux)
+
+	// Browser dashboard. http.FileServer is registered with the trailing
+	// slash so it matches everything not claimed by /v1 routes — index.html
+	// is served at the root, assets resolve by name.
+	mux.Handle("/", webui.Handler())
 
 	// If we are an aggregator start that
 	var aggMap *aggregator.AggGraphMap

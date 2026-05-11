@@ -1,0 +1,287 @@
+// dnms web UI.
+//
+// One page that talks to either the mapper-side or aggregator-side HTTP API,
+// renders the network graph via Cytoscape, and colors links by the
+// route-correlation suspicion score from /v1/graph/edges/health.
+//
+// Same-origin: the Go binary serves this HTML from / and the JSON API from
+// /v1/..., so no cross-origin requests and no CORS headache.
+
+(function () {
+    const $ = (sel) => document.querySelector(sel);
+
+    const state = {
+        aggregator: false,           // toggled by header checkbox
+        cy: null,                    // cytoscape instance
+        eventSource: null,           // SSE for live graph mutations
+        healthTimer: null,           // poll timer for edges/health
+    };
+
+    function basePath() {
+        return state.aggregator ? "/v1/aggregator" : "/v1";
+    }
+
+    function setStatus(msg) { $("#status").textContent = msg; }
+    function setError(msg) {
+        const el = $("#error");
+        if (!msg) { el.classList.add("hidden"); el.textContent = ""; return; }
+        el.classList.remove("hidden");
+        el.textContent = msg;
+    }
+
+    async function fetchJSON(path) {
+        const r = await fetch(path);
+        if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
+        return r.json();
+    }
+
+    function suspicionColor(s) {
+        // s is in [-1, 1] in theory; clamp and map to a green→yellow→red ramp.
+        if (s == null || !isFinite(s)) return "#6a6f80";
+        const v = Math.max(0, Math.min(1, s));
+        if (v < 0.05) return "#4cd07a"; // green
+        if (v < 0.25) return "#ffb53d"; // amber
+        return "#ff5a6b";               // red
+    }
+
+    function renderGraph(graph, healthByEdge) {
+        const nodes = Object.entries(graph.nodes || {}).map(([id, n]) => ({
+            data: { id, label: id, dnsNames: n.dns_names || [] }
+        }));
+        const edges = Object.entries(graph.edges || {}).map(([id, e]) => {
+            const key = `${e.src};${e.dst}`;
+            const h = healthByEdge ? healthByEdge[key] : null;
+            return {
+                data: {
+                    id,
+                    source: e.src,
+                    target: e.dst,
+                    suspicion: h ? h.suspicion : null,
+                    lossThrough: h ? h.avgLossThrough : null,
+                    lossNot: h ? h.avgLossNotThrough : null,
+                    routesThrough: h ? h.routesThrough : 0,
+                    color: suspicionColor(h && h.suspicion),
+                }
+            };
+        });
+
+        if (state.cy) state.cy.destroy();
+        state.cy = cytoscape({
+            container: $("#graph"),
+            elements: [...nodes, ...edges],
+            wheelSensitivity: 0.2,
+            style: [
+                {
+                    selector: "node",
+                    style: {
+                        "background-color": "#6ea8ff",
+                        label: "data(label)",
+                        color: "#d5d8e3",
+                        "font-size": "10px",
+                        "text-valign": "bottom",
+                        "text-margin-y": 4,
+                        "text-outline-color": "#0f1116",
+                        "text-outline-width": 2,
+                        width: 14,
+                        height: 14,
+                    },
+                },
+                {
+                    selector: "node:selected",
+                    style: { "background-color": "#fff", "border-width": 2, "border-color": "#fff" },
+                },
+                {
+                    selector: "edge",
+                    style: {
+                        width: 2,
+                        "line-color": "data(color)",
+                        "target-arrow-color": "data(color)",
+                        "target-arrow-shape": "triangle",
+                        "curve-style": "straight",
+                        opacity: 0.85,
+                    },
+                },
+                {
+                    selector: "edge:selected",
+                    style: { width: 4 },
+                },
+            ],
+            layout: { name: "cose", animate: false, fit: true, padding: 30 },
+        });
+
+        state.cy.on("tap", "node", (evt) => showNodeDetails(evt.target, graph));
+        state.cy.on("tap", "edge", (evt) => showEdgeDetails(evt.target, graph));
+        state.cy.on("tap", (evt) => {
+            if (evt.target === state.cy) hideDetails();
+        });
+    }
+
+    function showNodeDetails(node, graph) {
+        const id = node.id();
+        const data = node.data();
+        const incidentEdges = node.connectedEdges();
+        const html = `
+            <h2>Node ${escape(id)}</h2>
+            <dl>
+                <dt>name</dt><dd>${escape(id)}</dd>
+                <dt>DNS</dt><dd>${data.dnsNames.length ? data.dnsNames.map(escape).join("<br>") : "<span style='color:var(--muted)'>(none)</span>"}</dd>
+                <dt>incident links</dt><dd>${incidentEdges.length}</dd>
+            </dl>
+            <h3>Connected links</h3>
+            <ul>
+                ${incidentEdges.map(e => `<li>${escape(e.data("source"))} → ${escape(e.data("target"))} ${formatSuspicionInline(e.data("suspicion"))}</li>`).join("")}
+            </ul>
+        `;
+        showDetails(html);
+    }
+
+    function showEdgeDetails(edge, graph) {
+        const d = edge.data();
+        const routes = routesThroughLink(graph, d.source, d.target);
+        const html = `
+            <h2>Link ${escape(d.source)} → ${escape(d.target)}</h2>
+            <dl>
+                <dt>suspicion</dt><dd>${formatNumber(d.suspicion)}</dd>
+                <dt>avg loss (routes through)</dt><dd>${formatPercent(d.lossThrough)}</dd>
+                <dt>avg loss (routes not through)</dt><dd>${formatPercent(d.lossNot)}</dd>
+                <dt>routes through</dt><dd>${d.routesThrough}</dd>
+            </dl>
+            <h3>Routes through this link (${routes.length})</h3>
+            <ul>
+                ${routes.map(r => `<li>${escape(r.summary)} <span style="color:var(--muted)">(loss ${formatPercent(r.lossRate)}, ${r.numPoints} samples)</span></li>`).join("") || "<li><span style='color:var(--muted)'>(none with samples)</span></li>"}
+            </ul>
+        `;
+        showDetails(html);
+    }
+
+    function routesThroughLink(graph, src, dst) {
+        const out = [];
+        for (const [, r] of Object.entries(graph.routes || {})) {
+            const path = r.path || [];
+            for (let i = 1; i < path.length; i++) {
+                if (path[i - 1] === src && path[i] === dst) {
+                    out.push({
+                        summary: path.join(" → "),
+                        lossRate: r.metrics ? r.metrics.lossRate : 0,
+                        numPoints: r.metrics ? r.metrics.numPoints : 0,
+                    });
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    function showDetails(html) {
+        $("#details-body").innerHTML = html;
+        $("#details").classList.remove("hidden");
+    }
+    function hideDetails() {
+        $("#details").classList.add("hidden");
+    }
+
+    function escape(s) {
+        return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+    function formatNumber(n) {
+        if (n == null || !isFinite(n)) return "–";
+        return n.toFixed(3);
+    }
+    function formatPercent(n) {
+        if (n == null || !isFinite(n)) return "–";
+        return (n * 100).toFixed(1) + "%";
+    }
+    function formatSuspicionInline(s) {
+        if (s == null) return "";
+        const color = suspicionColor(s);
+        return `<span style="color:${color}">[s=${s.toFixed(2)}]</span>`;
+    }
+
+    async function loadAll() {
+        try {
+            setStatus("loading…");
+            const [graph, health] = await Promise.all([
+                fetchJSON(basePath() + "/graph"),
+                fetchJSON(basePath() + "/graph/edges/health").catch(() => []),
+            ]);
+            const healthByEdge = {};
+            for (const h of health) healthByEdge[`${h.src};${h.dst}`] = h;
+            updateCounts(graph);
+            renderGraph(graph, healthByEdge);
+            setStatus(`loaded @ ${new Date().toLocaleTimeString()}`);
+            setError(null);
+        } catch (err) {
+            setError(err.message);
+            setStatus("error");
+        }
+    }
+
+    async function refreshHealth() {
+        if (!state.cy) return;
+        try {
+            const health = await fetchJSON(basePath() + "/graph/edges/health");
+            const byKey = {};
+            for (const h of health) byKey[`${h.src};${h.dst}`] = h;
+            state.cy.edges().forEach((e) => {
+                const key = `${e.data("source")};${e.data("target")}`;
+                const h = byKey[key];
+                if (h) {
+                    e.data("suspicion", h.suspicion);
+                    e.data("lossThrough", h.avgLossThrough);
+                    e.data("lossNot", h.avgLossNotThrough);
+                    e.data("routesThrough", h.routesThrough);
+                    e.data("color", suspicionColor(h.suspicion));
+                }
+            });
+            setStatus(`health refreshed @ ${new Date().toLocaleTimeString()}`);
+        } catch (err) {
+            setError(err.message);
+        }
+    }
+
+    function updateCounts(graph) {
+        $("#cnt-nodes").textContent = Object.keys(graph.nodes || {}).length;
+        $("#cnt-links").textContent = Object.keys(graph.edges || {}).length;
+        $("#cnt-routes").textContent = Object.keys(graph.routes || {}).length;
+        // peers count isn't in /graph; fetch separately, best effort
+        fetch(basePath().replace("/aggregator", "") + "/mapper/peers")
+            .then(r => r.ok ? r.json() : [])
+            .then(peers => { $("#cnt-peers").textContent = peers.length; })
+            .catch(() => { $("#cnt-peers").textContent = "–"; });
+    }
+
+    function startSSE() {
+        if (state.eventSource) { state.eventSource.close(); state.eventSource = null; }
+        const url = basePath() + "/events/graph";
+        if (!window.EventSource) return;
+        const es = new EventSource(url);
+        // Live mutation events: just trigger a full reload. Cheap, keeps the
+        // graph in sync without us reimplementing the diff logic per-event.
+        const reload = () => loadAll();
+        ["addNodeEvent","removeNodeEvent","updateNodeEvent","addLinkEvent","removeLinkEvent","addRouteEvent","removeRouteEvent","updateRouteEvent"]
+            .forEach(name => es.addEventListener(name, reload));
+        es.onerror = () => { /* EventSource auto-reconnects */ };
+        state.eventSource = es;
+    }
+
+    function startHealthPolling() {
+        if (state.healthTimer) clearInterval(state.healthTimer);
+        // Attribution is query-time on the server, no event stream, so poll.
+        state.healthTimer = setInterval(refreshHealth, 5000);
+    }
+
+    function switchView() {
+        state.aggregator = $("#view-aggregator").checked;
+        loadAll();
+        startSSE();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        $("#view-aggregator").addEventListener("change", switchView);
+        $("#refresh").addEventListener("click", loadAll);
+        $("#details-close").addEventListener("click", hideDetails);
+        loadAll();
+        startSSE();
+        startHealthPolling();
+    });
+})();
